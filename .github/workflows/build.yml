@@ -1,0 +1,28 @@
+name: Android checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  debug:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare pinned tools
+        run: python scripts/bootstrap.py
+      - name: Build native tunnel
+        shell: pwsh
+        run: ./scripts/build-native.ps1
+      - name: Tests and debug APK
+        shell: pwsh
+        run: ./build.ps1 -DebugOnly
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AndroidToolbox-debug
+          path: app/build/outputs/apk/debug/*.apk

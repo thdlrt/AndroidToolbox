@@ -1,0 +1,16 @@
+.gradle/
+.build/
+.signing/
+**/build/
+local.properties
+app/src/main/jniLibs/
+outputs/
+.agent/
+.agents/
+*.log
+*.hprof
+*.jks
+*.keystore
+*.dpapi
+.idea/
+__pycache__/

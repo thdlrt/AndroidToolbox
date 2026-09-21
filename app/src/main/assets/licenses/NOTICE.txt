@@ -1,0 +1,13 @@
+AndroidToolbox (includes the LanBridge Android VPN client)
+
+hev-socks5-tunnel 2.17.1 (MIT), https://github.com/heiher/hev-socks5-tunnel
+Built from the upstream release source archive with Android NDK r27c.
+Includes hev-task-system (MIT), libyaml (MIT), lwIP (BSD), and the upstream
+core implementation; see the accompanying individual license files.
+
+OkHttp 4.12.0, Okio and Kotlin standard library: Apache License 2.0.
+https://github.com/square/okhttp
+https://github.com/square/okio
+https://github.com/JetBrains/kotlin
+
+This is an independent personal client, not an official fnOS/FN Connect app.
