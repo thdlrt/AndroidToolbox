@@ -10,6 +10,27 @@ ROOT = Path(__file__).resolve().parents[1]
 CACHE = ROOT / '.build'
 
 
+def extract_native(path, destination):
+    """Materialize header links; Windows runners need not grant symlink rights."""
+    destination = destination.resolve()
+    with tarfile.open(path) as archive:
+        members = archive.getmembers()
+        archive.extractall(destination, members=[m for m in members if not (m.issym() or m.islnk())], filter='data')
+        for member in members:
+            if not (member.issym() or member.islnk()):
+                continue
+            target = destination / member.name
+            if not target.resolve().is_relative_to(destination):
+                raise RuntimeError('Archive link escapes destination')
+            # extractfile resolves the archived link inside the archive itself.
+            with archive.extractfile(member) as source:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if target.is_symlink():
+                    target.unlink()
+                with target.open('wb') as output:
+                    shutil.copyfileobj(source, output)
+
+
 def download(name, url, digest, algorithm='sha256'):
     path = CACHE / name
     def valid():
@@ -46,7 +67,7 @@ def main():
         with zipfile.ZipFile(path) as archive: archive.extractall(CACHE)
     if not (CACHE/'native-source/hev-socks5-tunnel-2.17.1/Android.mk').is_file():
         path=download('hev-source.tar.xz','https://github.com/heiher/hev-socks5-tunnel/releases/download/2.17.1/hev-socks5-tunnel-2.17.1.tar.xz','a7b86050091c5a268d81de70b95d3bb0871ba4136160662b6496596761c2f9a7')
-        with tarfile.open(path) as archive: archive.extractall(CACHE/'native-source',filter='data')
+        extract_native(path, CACHE/'native-source')
     (ROOT/'local.properties').write_text('sdk.dir='+sdk.as_posix().replace(':',r'\:')+'\n',encoding='utf-8')
     print('Toolchain ready:',CACHE)
 
