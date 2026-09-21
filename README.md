@@ -4,6 +4,8 @@
 
 [下载正式 APK](https://github.com/thdlrt/AndroidToolbox/releases/latest) · [架构与扩展](docs/ARCHITECTURE.md) · [贡献指南](CONTRIBUTING.md)
 
+<img src="docs/images/home.png" alt="工具首页" width="280"> <img src="docs/images/settings.png" alt="设置与更新" width="280">
+
 ## 功能
 
 - 工具首页与全部工具目录，支持设置首页常用项。
