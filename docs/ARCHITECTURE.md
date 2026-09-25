@@ -8,6 +8,9 @@
 - `BridgeVpnService`：前台 VPN 服务、连接生命周期、认证续期。
 - `NasSession`、`WsChannel`、`SocksBridge`：认证、WebSocket 隧道和本地 SOCKS5。
 - `LoginStore`：Android Keystore 绑定本机的密码加密存储。
+- `ToolUi`：共享原生控件、线条图标和按 600dp 当前窗口宽度切换的左右导航容器。
+- `WebDavSettings` / `WebDavActivity`：全局 WebDAV 连接、旧中转账号的一次性迁移；`relay.remote_path` 独立保存工具路径。已排队传输固定连接快照，后续改设置不会改变去向。
+- `RelayActivity` / `RelayService`：中转文件与本机缓存列表、系统文件 URI 授权、前台传输队列。
 - `AppUpdater`：应用级后台下载任务；独立 HTTP 客户端，不携带 NAS Cookie。
 - `ReleaseInfo`：正式版语义版本比较、官方资产路径校验。
 - `UpdateProvider`：仅通过临时读取授权向安装器提供一个 APK。

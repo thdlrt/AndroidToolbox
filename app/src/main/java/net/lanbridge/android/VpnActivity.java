@@ -42,15 +42,14 @@ public final class VpnActivity extends Activity {
         card.addView(field,new LinearLayout.LayoutParams(-1,dp(52)));gap(card,16);return field;
     }
     private Button button(String label,boolean primary) {
-        Button b=new Button(this);b.setText(label);b.setTextSize(15);b.setAllCaps(false);b.setTextColor(Color.parseColor(primary?"#FFFFFF":"#386CF4"));b.setBackground(box(primary?"#386CF4":"#EEF3FF",12));return b;
+        return ToolUi.button(this,label,primary,()->{});
     }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);store=new LoginStore(this);getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(Color.parseColor("#F3F6FC"));
         LinearLayout root=column();root.setPadding(dp(20),dp(20),dp(20),dp(24));scroll.addView(root);
-        root.setOnApplyWindowInsetsListener((v,insets)-> { root.setPadding(dp(20)+insets.getSystemWindowInsetLeft(),dp(20)+insets.getSystemWindowInsetTop(),dp(20)+insets.getSystemWindowInsetRight(),dp(24)+insets.getSystemWindowInsetBottom());return insets; });
-        Button back=button("‹ 工具箱",false);root.addView(back);back.setOnClickListener(v->finish());gap(root,16);
-        LinearLayout heading=new LinearLayout(this);heading.setGravity(Gravity.CENTER_VERTICAL);ImageView icon=new ImageView(this);icon.setImageResource(R.drawable.ic_bridge);heading.addView(icon,new LinearLayout.LayoutParams(dp(42),dp(42)));
+        root.addView(ToolUi.iconButton(this,"back","返回工具箱",this::finish));gap(root,16);
+        LinearLayout heading=new LinearLayout(this);heading.setGravity(Gravity.CENTER_VERTICAL);ImageView icon=ToolUi.icon(this,"shield",ToolUi.BLUE);heading.addView(icon,new LinearLayout.LayoutParams(dp(36),dp(36)));
         TextView title=text("回家 VPN",25,"#182640");title.setTypeface(null,Typeface.BOLD);LinearLayout.LayoutParams titleParams=new LinearLayout.LayoutParams(-2,-2);titleParams.leftMargin=dp(12);heading.addView(title,titleParams);root.addView(heading);gap(root,24);
         LinearLayout stateCard=card(root);status=text("未连接",23,"#1D3157");status.setTypeface(null,Typeface.BOLD);stateCard.addView(status);gap(stateCard,8);details=text("通过 FN Connect 访问家中网络",14,"#637493");stateCard.addView(details);gap(stateCard,14);metrics=text("上传 0 KiB    下载 0 KiB",13,"#637493");stateCard.addView(metrics);
         error=text("",14,"#B34824");error.setPadding(0,0,0,dp(16));root.addView(error);
@@ -68,9 +67,9 @@ public final class VpnActivity extends Activity {
         LinearLayout testing=card(root);probe=button("测试回家连接",false);testing.addView(probe,new LinearLayout.LayoutParams(-1,dp(48)));probe.setOnClickListener(v->startService(new Intent(this,BridgeVpnService.class).setAction(BridgeVpnService.PROBE)));
         gap(testing,12);probeResult=text("",13,"#52617A");testing.addView(probeResult);
         TextView note=text("首次连接需确认 Android VPN 授权。全局模式支持 TCP；普通 UDP、QUIC 和 IPv6 暂不支持。开启后可切换应用，通知栏可直接断开。",13,"#73819B");root.addView(note);gap(root,16);
-        TextView version=text(BuildConfig.VERSION_NAME+" · Android 10+",12,"#93A0B7");root.addView(version);setContentView(scroll);
+        TextView version=text(BuildConfig.VERSION_NAME+" · Android 10+",12,"#64748B");root.addView(version);setContentView(new ToolUi.Shell(this,scroll,"vpn"));
     }
-    private void showError(String text) { error.setText(text);error.setVisibility(View.VISIBLE); }
+    private void showError(String text) { ToolUi.update(error,text);error.setVisibility(View.VISIBLE); }
     private void connect() {
         String phase=BridgeVpnService.phase;
         if(phase.equals("connecting")||phase.equals("connected")) { startService(new Intent(this,BridgeVpnService.class).setAction(BridgeVpnService.DISCONNECT));return; }
@@ -80,7 +79,7 @@ public final class VpnActivity extends Activity {
             if(p.isEmpty()) p=store.password(o,u);
             if(p.isEmpty()) throw new IllegalArgumentException("请填写密码；成功连接后即可记住登录");
             credentials=new BridgeVpnService.Credentials(o,u,p,scope.getSelectedItemPosition()==1?"all":"lan",remember.isChecked());
-            origin.setText(o);error.setText("");
+            origin.setText(o);ToolUi.update(error,"");
             ((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(password.getWindowToken(),0);
             if(Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)
                 { requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},7);return; }
@@ -98,13 +97,13 @@ public final class VpnActivity extends Activity {
     }
     private void render() {
         String phase=BridgeVpnService.phase;boolean online=phase.equals("connected"),working=phase.equals("connecting")||phase.equals("stopping");
-        status.setText(online?"已连接":phase.equals("connecting")?"正在连接":phase.equals("stopping")?"正在断开":phase.equals("error")?"连接失败":"未连接");
-        details.setText(BridgeVpnService.message);metrics.setText(String.format(Locale.CHINA,"上传 %.1f KiB    下载 %.1f KiB    连接 %d",BridgeVpnService.tx/1024.0,BridgeVpnService.rx/1024.0,BridgeVpnService.active));
-        connect.setText(online?"断开":phase.equals("connecting")?"取消连接":"连接");connect.setEnabled(!phase.equals("stopping"));
+        ToolUi.update(status,online?"已连接":phase.equals("connecting")?"正在连接":phase.equals("stopping")?"正在断开":phase.equals("error")?"连接失败":"未连接");
+        ToolUi.update(details,BridgeVpnService.message);ToolUi.update(metrics,String.format(Locale.CHINA,"上传 %.1f KiB    下载 %.1f KiB    连接 %d",BridgeVpnService.tx/1024.0,BridgeVpnService.rx/1024.0,BridgeVpnService.active));
+        ToolUi.update(connect,online?"断开":phase.equals("connecting")?"取消连接":"连接");connect.setEnabled(!phase.equals("stopping"));
         origin.setEnabled(!online&&!working);user.setEnabled(!online&&!working);password.setEnabled(!online&&!working);scope.setEnabled(!online&&!working);remember.setEnabled(!working);
-        probe.setEnabled(online);probe.setText("检查隧道会话");probeResult.setText(BridgeVpnService.probeResult);
-        password.setHint(store.hasPassword()?"已加密保存，留空即可连接":"请输入飞牛密码");forget.setVisibility(store.hasPassword()?View.VISIBLE:View.GONE);forget.setEnabled(!working);
-        if(online && !lastPhase.equals(phase)) { password.setText("");error.setText(""); }
+        probe.setEnabled(online);ToolUi.update(probe,"检查隧道会话");ToolUi.update(probeResult,BridgeVpnService.probeResult);
+        String hint=store.hasPassword()?"已加密保存，留空即可连接":"请输入飞牛密码";if(!android.text.TextUtils.equals(password.getHint(),hint))password.setHint(hint);forget.setVisibility(store.hasPassword()?View.VISIBLE:View.GONE);forget.setEnabled(!working);
+        if(online && !lastPhase.equals(phase)) { password.setText("");ToolUi.update(error,""); }
         lastPhase=phase;error.setVisibility(error.getText().length()==0?View.GONE:View.VISIBLE);
     }
     @Override protected void onResume() { super.onResume();handler.post(refresh); }

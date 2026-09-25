@@ -43,7 +43,7 @@ public final class RelayService extends Service {
         NotificationManager manager=getSystemService(NotificationManager.class);
         manager.createNotificationChannel(new NotificationChannel("relay","文件中转",NotificationManager.IMPORTANCE_LOW));
         PendingIntent open=PendingIntent.getActivity(this,41,new Intent(this,RelayActivity.class),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
-        startForeground(41,new Notification.Builder(this,"relay").setSmallIcon(R.drawable.ic_toolbox).setContentTitle("文件中转站").setContentText("正在传输文件，点此查看进度或取消").setContentIntent(open).setOngoing(true).build());
+        startForeground(41,new Notification.Builder(this,"relay").setSmallIcon(R.drawable.ic_notification).setContentTitle("文件中转站").setContentText("正在传输文件，点此查看进度或取消").setContentIntent(open).setOngoing(true).build());
         synchronized(RelayService.class){if(working)return START_NOT_STICKY;working=true;}
         new Thread(()->{
             while(true){

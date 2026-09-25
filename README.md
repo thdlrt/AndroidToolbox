@@ -4,11 +4,13 @@
 
 [下载正式 APK](https://github.com/thdlrt/AndroidToolbox/releases/latest) · [架构与扩展](docs/ARCHITECTURE.md) · [贡献指南](CONTRIBUTING.md)
 
-<img src="docs/images/home.png" alt="工具首页" width="280"> <img src="docs/images/settings.png" alt="设置与更新" width="280">
+<img src="docs/images/relay-phone.png" alt="手机上的文件中转站" width="240"> <img src="docs/images/relay-fold.png" alt="折叠屏展开后的左侧导航与文件列表" width="420">
 
 ## 功能
 
 - 工具首页与全部工具目录，支持设置首页常用项。
+- 折叠屏展开、平板与宽屏窗口自动显示左侧功能导航；窄屏使用底部导航。统一图标、卡片和文件列表，长按文件多选，常用操作更集中。
+- 设置中的 WebDAV 连接供文件中转站共用，中转站只需设置远端路径；旧连接自动迁移。
 - 文件中转站：从其他应用“打开方式”或“分享”直接上传文件，支持多文件队列、后台传输、搜索排序、单个/批量删除、下载到系统目录及跨应用打开/分享；已下载缓存可重复打开或清理。使用方法见 [文件中转站](docs/FILE-RELAY.md)。
 - 回家 VPN：通过 fnOS 局域网桥和 FN Connect 访问局域网，或使用家中 IPv4 TCP 出口。
 - Android Keystore 加密记住密码，VPN 前台服务在离开页面后继续运行。

@@ -42,7 +42,7 @@ public final class BridgeVpnService extends VpnService {
     private Notification notification(String text) {
         PendingIntent show=PendingIntent.getActivity(this,0,new Intent(this,VpnActivity.class),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
         PendingIntent stop=PendingIntent.getService(this,1,new Intent(this,BridgeVpnService.class).setAction(DISCONNECT),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
-        return new Notification.Builder(this,"vpn").setSmallIcon(R.drawable.ic_bridge).setContentTitle("回家 VPN").setContentText(text)
+        return new Notification.Builder(this,"vpn").setSmallIcon(R.drawable.ic_notification).setContentTitle("回家 VPN").setContentText(text)
             .setOngoing(true).setContentIntent(show).addAction(new Notification.Action.Builder(null,"断开",stop).build()).build();
     }
     private void update(String next,String text) {

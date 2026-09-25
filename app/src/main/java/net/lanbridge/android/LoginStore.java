@@ -27,13 +27,14 @@ public final class LoginStore {
     public boolean hasPassword() { return preferences.contains("cipher"); }
     public String origin() { return preferences.getString("origin",""); }
     public String username() { return preferences.getString("username",""); }
+    public String revision() { return preferences.getString("revision",""); }
     public String scope() { return preferences.getString("scope","lan"); }
     public void config(String origin,String username,String scope) { preferences.edit().putString("origin",origin).putString("username",username).putString("scope",scope).apply(); }
     public void save(String origin,String username,String password,String scope) throws Exception {
         Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.ENCRYPT_MODE,key());
         byte[] plain=new JSONObject().put("origin",origin).put("username",username).put("password",password).toString().getBytes(StandardCharsets.UTF_8);
         byte[] encrypted=cipher.doFinal(plain);
-        preferences.edit().putString("origin",origin).putString("username",username).putString("scope",scope)
+        preferences.edit().putString("origin",origin).putString("username",username).putString("scope",scope).putString("revision",java.util.UUID.randomUUID().toString())
             .putString("iv",Base64.getEncoder().encodeToString(cipher.getIV())).putString("cipher",Base64.getEncoder().encodeToString(encrypted)).apply();
         java.util.Arrays.fill(plain,(byte)0);
     }
