@@ -43,7 +43,14 @@ class Handler(BaseHTTPRequestHandler):
             target = ROOT / '.build/relay-validation-state.json'
             temporary = target.with_suffix('.tmp')
             temporary.write_text(json.dumps(report, ensure_ascii=False), encoding='utf-8')
-            temporary.replace(target)
+            # Windows may briefly lock the report while the smoke test reads it.
+            for attempt in range(20):
+                try:
+                    temporary.replace(target)
+                    break
+                except PermissionError:
+                    if attempt == 19: raise
+                    time.sleep(.02)
 
     def response(self, body):
         path = unquote(urlsplit(self.path).path)
