@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:label="Relay QA Receiver" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:allowBackup="false">
+        <provider android:name=".FixtureProvider" android:authorities="net.lanbridge.relayfixture.files" android:exported="false" android:grantUriPermissions="true"/>
+        <activity android:name=".FixtureActivity" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.VIEW"/><category android:name="android.intent.category.DEFAULT"/><data android:scheme="content" android:mimeType="*/*"/></intent-filter>
+            <intent-filter><action android:name="android.intent.action.SEND"/><category android:name="android.intent.category.DEFAULT"/><data android:mimeType="*/*"/></intent-filter>
+        </activity>
+    </application>
+</manifest>

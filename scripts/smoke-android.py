@@ -39,8 +39,12 @@ def click(text):
 run('shell','am','force-stop','net.lanbridge.android')
 run('shell','am','start','-n','net.lanbridge.android/.MainActivity')
 click('全部工具')
-pin=wait('显示在工具首页')
-if pin.get('checked')=='true': click('显示在工具首页')
+wait('显示在工具首页')
+while True:
+    pins=[n for n in screen().iter('node') if n.get('text')=='显示在工具首页' and n.get('checked')=='true']
+    if not pins: break
+    x1,y1,x2,y2=map(int,re.findall(r'\d+',pins[0].get('bounds')))
+    run('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2))
 click('工具首页');wait('暂无常用工具')
 run('shell','am','force-stop','net.lanbridge.android')
 run('shell','am','start','-n','net.lanbridge.android/.MainActivity')

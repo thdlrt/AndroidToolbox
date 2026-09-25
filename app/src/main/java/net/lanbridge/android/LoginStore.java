@@ -11,17 +11,18 @@ import org.json.JSONObject;
 
 /** NAS passwords are bound to this device's Android Keystore and excluded from backup. */
 public final class LoginStore {
-    private static final String ALIAS="lanbridge-login-v1";
+    private final String alias;
     private final SharedPreferences preferences;
-    public LoginStore(Context context) { preferences=context.getSharedPreferences("profile",Context.MODE_PRIVATE); }
+    public LoginStore(Context context) { this(context,"profile","lanbridge-login-v1"); }
+    public LoginStore(Context context,String name,String alias) { preferences=context.getSharedPreferences(name,Context.MODE_PRIVATE);this.alias=alias; }
     private SecretKey key() throws Exception {
         KeyStore ks=KeyStore.getInstance("AndroidKeyStore");ks.load(null);
-        if(!ks.containsAlias(ALIAS)) {
+        if(!ks.containsAlias(alias)) {
             KeyGenerator generator=KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES,"AndroidKeyStore");
-            generator.init(new KeyGenParameterSpec.Builder(ALIAS,KeyProperties.PURPOSE_ENCRYPT|KeyProperties.PURPOSE_DECRYPT)
+            generator.init(new KeyGenParameterSpec.Builder(alias,KeyProperties.PURPOSE_ENCRYPT|KeyProperties.PURPOSE_DECRYPT)
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build());generator.generateKey();
         }
-        return (SecretKey)ks.getKey(ALIAS,null);
+        return (SecretKey)ks.getKey(alias,null);
     }
     public boolean hasPassword() { return preferences.contains("cipher"); }
     public String origin() { return preferences.getString("origin",""); }

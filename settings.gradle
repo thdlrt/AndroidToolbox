@@ -2,3 +2,5 @@ pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal()
 dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
 rootProject.name = 'AndroidToolbox'
 include ':app'
+include ':relay-fixture'
+project(':relay-fixture').projectDir = file('tests/relay-fixture')

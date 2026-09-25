@@ -43,7 +43,7 @@ public final class MainActivity extends Activity {
         for(ToolRegistry.Tool tool:ToolRegistry.TOOLS){
             boolean favorite=getPreferences(0).getBoolean("favorite."+tool.id,true);
             if(id.equals("home")&&!favorite)continue;
-            LinearLayout c=card();LinearLayout heading=new LinearLayout(this);heading.setGravity(Gravity.CENTER_VERTICAL);ImageView icon=new ImageView(this);icon.setImageResource(R.drawable.ic_bridge);heading.addView(icon,new LinearLayout.LayoutParams(dp(38),dp(38)));TextView name=text(tool.name,21);name.setPadding(dp(12),dp(6),0,dp(6));name.setTypeface(null,Typeface.BOLD);heading.addView(name);c.addView(heading);c.addView(text(tool.description,14));vpnState=text("未连接",14);c.addView(vpnState);
+            LinearLayout c=card();LinearLayout heading=new LinearLayout(this);heading.setGravity(Gravity.CENTER_VERTICAL);ImageView icon=new ImageView(this);icon.setImageResource(R.drawable.ic_bridge);heading.addView(icon,new LinearLayout.LayoutParams(dp(38),dp(38)));TextView name=text(tool.name,21);name.setPadding(dp(12),dp(6),0,dp(6));name.setTypeface(null,Typeface.BOLD);heading.addView(name);c.addView(heading);c.addView(text(tool.description,14));if(tool.id.equals("vpn")){vpnState=text("未连接",14);c.addView(vpnState);}
             button(c,"打开",()->startActivity(new Intent(this,tool.activity)));
             if(id.equals("tools")){CheckBox pin=new CheckBox(this);pin.setText("显示在工具首页");pin.setChecked(favorite);c.addView(pin);pin.setOnCheckedChangeListener((v,on)->getPreferences(0).edit().putBoolean("favorite."+tool.id,on).apply());}
         }
