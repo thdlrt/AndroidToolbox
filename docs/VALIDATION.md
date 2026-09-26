@@ -67,3 +67,14 @@
 - Windows `scripts/smoke_ledger_android.py` 对最新调试 APK 和本机独立 WebDAV 执行真实跨端测试：项目/账目/诊断配置和附件 PC→Android，Android 图片→PC，离线同字段冲突、不同字段合并、显式解决后回传、删除墓碑、按项目日期导出，以及冷启动自动拉取全部通过（225 个 HTTP 请求）。
 - Python/Java JVM 互通脚本通过金额、项目、并发合并、冲突解决、收入状态归一及删除与离线编辑竞争的逐字段比较。
 - 正式 APK 在 `emulator-5560` 从已安装 0.3.3 覆盖升级至 0.4.0；升级前后 4 份 shared_prefs 文件 SHA-256 完全一致，启动及系统包信息正常。
+
+## 2026-09-26 · 0.5.0 统一 WebDAV 与配置备份
+
+- `./build.ps1 -DebugOnly` 与正式签名构建通过：35 个 JVM 测试，34 通过，1 个真实 NAS 测试按原策略跳过。
+- `emulator-5560` 的 `NavigationInstrumentation -e action settings_ui` 通过 7 项检查：统一地址/账号/密码/根目录四字段，手动备份入口、自动同步状态；中转站无独立路径输入，记账直接打开统一设置。
+- 实际合成 WebDAV 下 `action webdav` 基线通过 10 项检查：保留旧记账根目录、派生中转目录、迁移旧文件、配置上传/列举/下载/恢复，密码排除、恢复副本、当前连接和记账数据保留。
+- `action webdav -e move_root <新根目录>` 额外覆盖旧根迁移，以及 A→B→A 后上传新文件、再次 A→B 的重复切换场景。迁移完成标记按任务代次保存，重复切换不会跳过新文件。
+- 最终 APK `outputs/AndroidToolbox-0.5.0.apk`：包名 `net.lanbridge.android`，versionCode `10`，versionName `0.5.0`；4,632,308 字节，SHA-256 `4ce4c0abf22390163b29fb0f9e72382eac45c2c31da6af01bfb31efe19b1ef03`。v2 签名通过，与 0.4.0 同证书（SHA-256 `f299b831be45343d8f2fb1b6f2c6557075946f93ab099fd1b4d746f1fd2501d7`）。
+- 最终签名源码的合成 WebDAV 检查：13 项通过，含 A→B→A→B 根目录往返后新增文件再次迁移；跨端完整验收共 469 次请求。
+- 最终记账互通回归 8 类场景通过（276 次 HTTP 请求）：双向项目/账目/附件/诊断配置、并发冲突与合并、删除、PC 按项目日期导出、Android 冷启动自动同步。
+- 模拟器正式包 0.4.0 → 0.5.0 覆盖安装成功，包名与签名不变，启动成功；未对升级前后私有配置做哈希对照。

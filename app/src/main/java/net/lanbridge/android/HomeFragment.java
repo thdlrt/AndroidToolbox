@@ -49,9 +49,9 @@ public final class HomeFragment extends ToolFragment {
         if(content.getChildCount()==1){LinearLayout empty=card();empty.addView(text("暂无常用工具",18));button(empty,"选择常用工具",()->navigate("tools"));}
     }
     private void settings(){
-        LinearLayout connection=card();LinearLayout heading=new LinearLayout(context());heading.setGravity(Gravity.CENTER_VERTICAL);heading.addView(ToolUi.icon(context(),"cloud",ToolUi.BLUE),new LinearLayout.LayoutParams(dp(28),dp(28)));TextView label=text("WebDAV 连接",20);label.setPadding(dp(12),dp(6),0,dp(6));heading.addView(label);connection.addView(heading);
+        LinearLayout connection=card();LinearLayout heading=new LinearLayout(context());heading.setGravity(Gravity.CENTER_VERTICAL);heading.addView(ToolUi.icon(context(),"cloud",ToolUi.BLUE),new LinearLayout.LayoutParams(dp(28),dp(28)));TextView label=text("WebDAV 与备份",20);label.setPadding(dp(12),dp(6),0,dp(6));heading.addView(label);connection.addView(heading);
         try{WebDavSettings.migrate(context());}catch(Exception e){Toast.makeText(context(),e.getMessage(),1).show();}
-        LoginStore shared=WebDavSettings.store(context());TextView summary=text(shared.hasPassword()?"已配置 · 中转站、项目记账和诊断配置共用":"配置一次，供文件中转站和自动合并同步使用",14);summary.setTextColor(ToolUi.MUTED);connection.addView(summary);button(connection,shared.hasPassword()?"管理连接":"配置连接",()->startActivity(new Intent(context(),WebDavActivity.class)));
+        LoginStore shared=WebDavSettings.store(context());TextView summary=text(shared.hasPassword()?"已配置 · 所有工具共用一个根目录":"统一连接、自动同步和手动配置备份",14);summary.setTextColor(ToolUi.MUTED);connection.addView(summary);button(connection,shared.hasPassword()?"管理连接":"配置连接",()->startActivity(new Intent(context(),WebDavActivity.class)));
         LinearLayout c=card();c.addView(text("应用更新",20));c.addView(text("安卓工具箱 "+BuildConfig.VERSION_NAME,15));
         updateState=text(AppUpdater.get(context()).message,14);c.addView(updateState);
         updateButton=button(c,"检查更新",()->{AppUpdater u=AppUpdater.get(context());if(u.ready()) u.install(context());else if(u.available()!=null) u.download(context());else u.check();});

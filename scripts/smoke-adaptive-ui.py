@@ -54,14 +54,16 @@ try:
     capture('fold-selection')
     click('取消选择');click('上一级');wait('打开文件夹 folder');capture('fold-files')
     click('更多操作');wait('按时间清理');wait('上传日志');capture('fold-more')
-    click('中转目录');wait('远端中转路径')
+    click('WebDAV 与备份');wait('打开统一设置')
+    assert not any(n.get('class')=='android.widget.EditText' for n in screen()),'Relay still exposes a path editor'
+    click('打开统一设置');wait('统一根目录')
     fields=[n for n in screen() if n.get('class')=='android.widget.EditText']
-    assert len(fields)==1 and fields[0].get('text')=='inbox','Relay duplicated account fields or lost migrated path'
+    assert len(fields)==4,'Shared settings must expose URL, username, password and exactly one root'
     capture('fold-path')
-    click('设置');wait('WebDAV 连接');capture('fold-settings')
+    click('设置');wait('WebDAV 与备份');capture('fold-settings')
     click('回家 VPN');wait('NAS 地址');wait('飞牛管理员');capture('fold-vpn')
     size(1080,1920,420);wait('NAS 地址');assert not match('首页')
     click('返回工具箱');click('工具首页');wait('打开回家 VPN');capture('phone-home')
-    print('PASS: phone/800dp square layout, live resize and tool switching preserve folder+selection, shared connection path-only UI, global navigation, VPN compact layout')
+    print('PASS: phone/800dp square layout, live resize and tool switching preserve folder+selection, single shared root settings, global navigation, VPN compact layout')
 finally:
     run('shell','wm','size','reset');run('shell','wm','density','reset')

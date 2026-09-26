@@ -10,7 +10,7 @@
 - `NasSession`、`WsChannel`、`SocksBridge`：认证、WebSocket 隧道和本地 SOCKS5。
 - `LoginStore`：Android Keystore 绑定本机的密码加密存储。
 - `ToolUi`：共享原生控件、线条图标和按 600dp 当前窗口宽度切换的左右导航容器。
-- `WebDavSettings` / `WebDavFragment`：全局 WebDAV 连接、旧中转账号的一次性迁移；`relay.remote_path` 独立保存工具路径。已排队传输固定连接快照，后续改设置不会改变去向。
+- `WebDavSettings` / `WebDavFragment`：唯一 WebDAV 连接与统一根目录。`ledger-v1`、`file-relay`、`config-backups/android` 均自动派生；旧服务路径仅作为内部迁移来源，不再可编辑。迁移保留源文件并使用禁止覆盖写入，冲突文件归入稳定的 legacy 子目录。迁移任务凭据仍使用设备 Keystore 保存。已排队传输固定连接快照，后续改设置不会改变去向。
 - `RelayFragment` / `RelayService`：中转文件与本机缓存列表、系统文件 URI 授权、前台传输队列。销毁后的异步列表回调不得再更新界面。
 - `ToolEntryActivity`：保留已有 Relay/VPN/WebDAV Activity 名称作为兼容入口；转入 MainActivity 时复制 Intent、ClipData 和 URI 授权。应用内直接切换 Fragment，外部分享入口不变。
 - `AppUpdater`：应用级后台下载任务；独立 HTTP 客户端，不携带 NAS Cookie。
@@ -32,3 +32,5 @@
 SHA-256 提供传输完整性，发布方身份最终由 APK 签名约束。签名密钥只保存在本机 `.signing`，不上传到仓库或 GitHub Actions。
 
 首版仅实现回家 VPN，仍是 IPv4 TCP 转发；普通 UDP、QUIC、ICMP、IPv6 不支持。工具箱迁移不声称解决 FN Connect 中继链路性能上限。
+
+- `AndroidConfigBackup` / `ConfigBackupService`：明确的配置白名单；手动上传和确认后恢复，不触及记账或附件。恢复前保存本机配置副本，WebDAV 连接/根目录与密码不会被恢复覆盖。
