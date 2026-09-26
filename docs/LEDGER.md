@@ -1,0 +1,35 @@
+# 项目记账与网络诊断
+
+## 使用
+
+1. 在设置中配置统一 WebDAV 连接。记账页的「同步设置」另填与 PC 一致的同步目录，默认 `WinToolbox`。文件中转站仍使用原有独立目录。
+2. 打开软件即在后台同步，不必先进入记账页面；修改后自动同步，应用进程存活时每 60 秒重试。离线修改先保存在手机。
+3. 「项目管理」可创建、改名、归档项目组。内置 AI报销项目采用 50% 分摊；普通项目默认完整金额。
+4. 新建记账可选择图片、PDF、OFD 文件或调用系统相机拍照，单附件不超过 50 MB。相机通过临时 URI 授权写入完整照片，不请求全盘存储权限。
+5. 可按项目、开始与结束日期筛选。表格导出在 PC 记账页完成，可选项目及日期区间。
+6. 网络诊断支持主机或 HTTP(S) URL、端口、超时和 TCP 次数，分别显示 DNS、TCP、证书验证 TLS、HTTP 阶段。保存的配置会与 PC 同步；诊断报告只保留在本机，可复制。工具箱应用被其自身回家 VPN 排除，因此诊断反映设备直连路径，不反映该 VPN 内的流量。
+
+## 合并规则
+
+- 在 `<同步目录>/ledger-v1/ops` 保存不可变 JSON 操作，附件在 `blobs/<sha256>`。仅使用带 `If-None-Match: *` 的新建上传，不覆盖同名操作。
+- 每条修改只记录变动字段和此前看到的父版本。不同记录或不同字段自动合并。
+- 同字段并发值全部保留；确定性展示一个候选并标记冲突，用户可在手机或 PC 的冲突入口选择保留值。
+- 删除记录使用永久删除标记。附件删除与并发旧附件修改冲突时优先删除，避免离线旧版本恢复附件。
+- 附件先验证 SHA-256 和大小，再上传关联操作。下载先验证附件，后接收引用操作。远端操作缺失祖先时保留待处理记录并提示错误，不展示不完整记录。
+- 设备时间仅用于展示；不以「最后修改时间」覆盖数据。设置备份的手动覆盖确认流程不参与记账同步。
+
+## 开发与验证
+
+`./build.ps1 -DebugOnly` 构建并运行 JVM 测试。新增覆盖：字段合并、并发冲突、显式解决、离线父版本补齐、删除防恢复、不可变记录、附件删除、金额成对一致、非法输入、1,200 次连续修改、旧编辑窗口与远端并发修改，以及本地 HTTP 的 HEAD→GET 回退。
+
+模拟器专用测试桥通过 `NavigationInstrumentation` 的 `action` 参数调用，不打包进正式 APK：
+
+```powershell
+adb -s emulator-5560 shell am instrument -w -e action ui net.lanbridge.android.debug.test/net.lanbridge.android.NavigationInstrumentation
+```
+
+`ui` 校验原生记账页、相机 intent 的输出 URI 与授权、完整 JPEG 回传、系统文档选择器回传、附件持久化及诊断页。相机和文件选择通过 instrumentation 拦截系统 intent 并提供真实文件字节，适合稳定验证结果处理，不代表真实相机硬件测试。另有 `action external` 模式等待真实系统相机和文档选择器回传；已在指定模拟器上实际点击快门、确认照片和选取 PNG 并通过。
+
+`sync` / `seed` 支持 `endpoint`、`remote_path`、`username`、`password` 参数，仅对明确指定的模拟器及临时测试服务器使用。`seed` 写入合法 PNG 附件，可用 `edit_id`、`note`、`edit_title` 修改已有测试记录，再触发真实 WebDAV 同步。输出位于应用私有目录 `files/ledger-test-result.json`。
+
+跨语言 JVM 测试桥 `LedgerFixture` 接受 `{operations,patches?}` JSON，输出 `{operations,entries,projects,network_profiles}`，便于与 PC Python 实现逐字段比较。

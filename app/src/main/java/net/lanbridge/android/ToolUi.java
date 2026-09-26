@@ -21,14 +21,37 @@ final class ToolUi {
     static ImageButton iconButton(Context c,String icon,String label,Runnable action){ImageButton b=new ImageButton(c);b.setImageDrawable(new Icon(icon,INK));b.setContentDescription(label);b.setTooltipText(label);b.setPadding(dp(c,12),dp(c,12),dp(c,12),dp(c,12));ripple(b,Color.TRANSPARENT,14);b.setOnClickListener(v->action.run());b.setLayoutParams(new LinearLayout.LayoutParams(dp(c,48),dp(c,48)));return b;}
     static ImageView icon(Context c,String name,int color){ImageView v=new ImageView(c);v.setImageDrawable(new Icon(name,color));v.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);return v;}
     static EditText field(Activity a,LinearLayout parent,String label,String value,boolean secret){TextView title=text(a,label,13,MUTED);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(-1,-2);tp.topMargin=dp(a,20);tp.bottomMargin=dp(a,8);parent.addView(title,tp);EditText e=new EditText(a);e.setSingleLine(true);e.setTextSize(16);e.setContentDescription(label);e.setText(value);e.setPadding(dp(a,14),0,dp(a,14),0);e.setInputType(secret?129:1);e.setSaveEnabled(!secret);e.setBackground(box(a,0xffedf1f7,12));parent.addView(e,new LinearLayout.LayoutParams(-1,dp(a,52)));return e;}
-    static void navigate(Activity a,String id){Intent i;if(id.equals("relay"))i=new Intent(a,RelayActivity.class);else if(id.equals("vpn"))i=new Intent(a,VpnActivity.class);else i=new Intent(a,MainActivity.class).putExtra("page",id);i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);a.startActivity(i);if(!(a instanceof MainActivity))a.finish();}
     static final class Shell extends LinearLayout {
-        private final Activity activity; private final LinearLayout rail; private View bottom; private String selected; private boolean wide;
-        Shell(Activity a,View body,String selected){super(a);activity=a;this.selected=selected;setOrientation(HORIZONTAL);setBackgroundColor(BG);rail=column(a);rail.setPadding(dp(a,16),dp(a,24),dp(a,16),dp(a,20));rail.setBackgroundColor(0xffedf1f8);addView(rail,new LinearLayout.LayoutParams(dp(a,184),-1));addView(body,new LinearLayout.LayoutParams(0,-1,1));rail.setVisibility(GONE);setOnApplyWindowInsetsListener((v,i)->{setPadding(i.getSystemWindowInsetLeft(),i.getSystemWindowInsetTop(),i.getSystemWindowInsetRight(),i.getSystemWindowInsetBottom());return i;});renderRail();}
-        void bottom(View view){bottom=view;bottom.setVisibility(wide?GONE:VISIBLE);}
-        void selected(String value){selected=value;renderRail();}
-        @Override protected void onSizeChanged(int w,int h,int ow,int oh){super.onSizeChanged(w,h,ow,oh);boolean next=w-getPaddingLeft()-getPaddingRight()>=dp(activity,600);if(next!=wide){wide=next;post(()->{rail.setVisibility(wide?VISIBLE:GONE);if(bottom!=null)bottom.setVisibility(wide?GONE:VISIBLE);});}}
-        private void renderRail(){rail.removeAllViews();TextView name=text(activity,"工具箱",22,INK);name.setTypeface(null,Typeface.BOLD);rail.addView(name,new LinearLayout.LayoutParams(-1,dp(activity,64)));String[][] items={{"home","首页","home"},{"relay","文件中转站","folder"},{"vpn","回家 VPN","shield"},{"tools","全部工具","grid"},{"settings","设置","settings"}};for(String[] item:items){boolean on=selected.equals(item[0]);LinearLayout row=new LinearLayout(activity);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(activity,12),0,dp(activity,8),0);ripple(row,on?0xffdfe8ff:Color.TRANSPARENT,14);row.addView(icon(activity,item[2],on?BLUE:MUTED),new LinearLayout.LayoutParams(dp(activity,22),dp(activity,22)));TextView label=text(activity,item[1],14,on?BLUE:INK);label.setPadding(dp(activity,12),0,0,0);row.addView(label);row.setContentDescription(item[1]);row.setFocusable(true);row.setOnClickListener(v->{if(activity instanceof MainActivity&&(item[0].equals("home")||item[0].equals("tools")||item[0].equals("settings")))((MainActivity)activity).show(item[0]);else if(!selected.equals(item[0]))navigate(activity,item[0]);});LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(activity,52));p.bottomMargin=dp(activity,8);rail.addView(row,p);}}
+        private final MainActivity activity;
+        private final LinearLayout rail;
+        private View bottom;
+        private String selected;
+        private boolean wide, bottomEnabled=true;
+        private final java.util.Map<String,LinearLayout> rows=new java.util.LinkedHashMap<>();
+        private final String[][] items={{"home","首页","home"},{"relay","文件中转站","folder"},{"vpn","回家 VPN","shield"},{"ledger","项目记账","file"},{"diagnostics","网络诊断","search"},{"tools","全部工具","grid"},{"settings","设置","settings"}};
+        Shell(MainActivity a,View body,String selected){
+            super(a);activity=a;this.selected=selected;setOrientation(HORIZONTAL);setBackgroundColor(BG);
+            rail=column(a);rail.setTag("toolbox-navigation");rail.setPadding(dp(a,16),dp(a,24),dp(a,16),dp(a,20));rail.setBackgroundColor(0xffedf1f8);
+            addView(rail,new LinearLayout.LayoutParams(dp(a,184),-1));addView(body,new LinearLayout.LayoutParams(0,-1,1));rail.setVisibility(GONE);
+            setOnApplyWindowInsetsListener((v,i)->{setPadding(i.getSystemWindowInsetLeft(),i.getSystemWindowInsetTop(),i.getSystemWindowInsetRight(),i.getSystemWindowInsetBottom());return i;});
+            TextView name=text(activity,"工具箱",22,INK);name.setTypeface(null,Typeface.BOLD);rail.addView(name,new LinearLayout.LayoutParams(-1,dp(activity,64)));
+            for(String[] item:items){
+                LinearLayout row=new LinearLayout(activity);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(activity,12),0,dp(activity,8),0);
+                row.addView(icon(activity,item[2],MUTED),new LinearLayout.LayoutParams(dp(activity,22),dp(activity,22)));
+                TextView label=text(activity,item[1],14,INK);label.setPadding(dp(activity,12),0,0,0);row.addView(label);
+                row.setContentDescription(item[1]);row.setFocusable(true);row.setOnClickListener(v->activity.show(item[0]));
+                LinearLayout.LayoutParams layout=new LinearLayout.LayoutParams(-1,dp(activity,52));layout.bottomMargin=dp(activity,8);rail.addView(row,layout);rows.put(item[0],row);
+            }
+            selected(selected);
+        }
+        void bottom(View view){bottom=view;updateNavigation();}
+        void bottomEnabled(boolean enabled){bottomEnabled=enabled;updateNavigation();}
+        private void updateNavigation(){rail.setVisibility(wide?VISIBLE:GONE);if(bottom!=null)bottom.setVisibility(wide||!bottomEnabled?GONE:VISIBLE);}
+        void selected(String value){
+            selected=value;
+            for(String[] item:items){LinearLayout row=rows.get(item[0]);boolean on=selected.equals(item[0]);row.setSelected(on);ripple(row,on?0xffdfe8ff:Color.TRANSPARENT,14);((ImageView)row.getChildAt(0)).setImageDrawable(new Icon(item[2],on?BLUE:MUTED));((TextView)row.getChildAt(1)).setTextColor(on?BLUE:INK);}
+        }
+        @Override protected void onSizeChanged(int w,int h,int ow,int oh){super.onSizeChanged(w,h,ow,oh);boolean next=w-getPaddingLeft()-getPaddingRight()>=dp(activity,600);if(next!=wide){wide=next;post(this::updateNavigation);}}
     }
     /** Original 24dp line glyphs, shared across navigation, file rows and actions. */
     static final class Icon extends Drawable {

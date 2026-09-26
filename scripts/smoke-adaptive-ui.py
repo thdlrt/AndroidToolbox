@@ -19,7 +19,7 @@ adb = [str(root/'.build/sdk/platform-tools/adb.exe'), '-s', args.serial]
 output = root/'outputs/ui-refinement'
 output.mkdir(parents=True, exist_ok=True)
 
-def run(*cmd): return subprocess.check_output(adb+list(cmd))
+def run(*cmd): return subprocess.check_output(adb+list(cmd),timeout=30)
 def screen():
     run('shell','uiautomator','dump','/sdcard/adaptive-ui.xml')
     return list(ET.fromstring(run('shell','cat','/sdcard/adaptive-ui.xml')).iter('node'))
@@ -49,6 +49,8 @@ try:
     click('打开文件 nested.txt',long=True);wait('已选 1 项')
     size(1800,1800,360)
     wait('首页');wait('已选 1 项');wait('nested.txt')
+    click('回家 VPN');wait('NAS 地址')
+    click('文件中转站');wait('已选 1 项');wait('nested.txt')
     capture('fold-selection')
     click('取消选择');click('上一级');wait('打开文件夹 folder');capture('fold-files')
     click('更多操作');wait('按时间清理');wait('上传日志');capture('fold-more')
@@ -60,6 +62,6 @@ try:
     click('回家 VPN');wait('NAS 地址');wait('飞牛管理员');capture('fold-vpn')
     size(1080,1920,420);wait('NAS 地址');assert not match('首页')
     click('返回工具箱');click('工具首页');wait('打开回家 VPN');capture('phone-home')
-    print('PASS: phone/800dp square layout, live resize preserves folder+selection, shared connection path-only UI, global navigation, VPN compact layout')
+    print('PASS: phone/800dp square layout, live resize and tool switching preserve folder+selection, shared connection path-only UI, global navigation, VPN compact layout')
 finally:
     run('shell','wm','size','reset');run('shell','wm','density','reset')

@@ -1,0 +1,1 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"><instrumentation android:name="net.lanbridge.android.LedgerInstrumentation" android:targetPackage="net.lanbridge.android.debug" android:label="Ledger emulator integration"/></manifest>

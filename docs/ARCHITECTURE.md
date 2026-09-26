@@ -2,20 +2,22 @@
 
 本项目从 LanBridgeAndroid 迁移。参考 WinToolbox 的工具首页、常用工具、功能页、设置和后台任务结构，使用原生 Android Java 实现，不引入桌面端运行时。
 
-- `MainActivity`：首页、工具目录、设置与更新状态。页面变化不持有或销毁 VPN。
+- `MainActivity`：唯一前台窗口，持有固定导航和右侧 Fragment 容器。宽屏切换只对内容做淡入，不启动新的整屏 Activity。
+- `ToolFragment` / `HomeFragment`：工具内容生命周期及首页、目录、设置。根页面使用 hide/show 复用视图，隐藏时停止轮询，后台服务独立运行；系统重建通过 Fragment 保存状态恢复。
 - `ToolRegistry`：工具 ID、名称、说明、Activity 的唯一登记入口。
-- `VpnActivity`：原回家 VPN 表单、状态和凭据操作。
+- `VpnFragment`：回家 VPN 表单、状态和凭据操作；保留未提交输入及系统权限结果回调。
 - `BridgeVpnService`：前台 VPN 服务、连接生命周期、认证续期。
 - `NasSession`、`WsChannel`、`SocksBridge`：认证、WebSocket 隧道和本地 SOCKS5。
 - `LoginStore`：Android Keystore 绑定本机的密码加密存储。
 - `ToolUi`：共享原生控件、线条图标和按 600dp 当前窗口宽度切换的左右导航容器。
-- `WebDavSettings` / `WebDavActivity`：全局 WebDAV 连接、旧中转账号的一次性迁移；`relay.remote_path` 独立保存工具路径。已排队传输固定连接快照，后续改设置不会改变去向。
-- `RelayActivity` / `RelayService`：中转文件与本机缓存列表、系统文件 URI 授权、前台传输队列。
+- `WebDavSettings` / `WebDavFragment`：全局 WebDAV 连接、旧中转账号的一次性迁移；`relay.remote_path` 独立保存工具路径。已排队传输固定连接快照，后续改设置不会改变去向。
+- `RelayFragment` / `RelayService`：中转文件与本机缓存列表、系统文件 URI 授权、前台传输队列。销毁后的异步列表回调不得再更新界面。
+- `ToolEntryActivity`：保留已有 Relay/VPN/WebDAV Activity 名称作为兼容入口；转入 MainActivity 时复制 Intent、ClipData 和 URI 授权。应用内直接切换 Fragment，外部分享入口不变。
 - `AppUpdater`：应用级后台下载任务；独立 HTTP 客户端，不携带 NAS Cookie。
 - `ReleaseInfo`：正式版语义版本比较、官方资产路径校验。
 - `UpdateProvider`：仅通过临时读取授权向安装器提供一个 APK。
 
-新工具需实现自己的 Activity、在 Manifest 注册，再加入 ToolRegistry。保持权限按需申请，不为尚未实现的工具添加空入口。
+新工具需实现 ToolFragment，在 ToolRegistry 登记，并在 MainActivity 的页面工厂与入口映射中接入。需要外部入口时才添加 ToolEntryActivity 子类和 Manifest 声明。保持权限按需申请，不为尚未实现的工具添加空入口。
 
 ## 迁移与数据
 

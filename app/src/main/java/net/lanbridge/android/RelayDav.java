@@ -94,6 +94,13 @@ public final class RelayDav implements AutoCloseable {
         try(Response r=request("MKCOL",url(p),RequestBody.create(new byte[0],null))){if(r.code()==409)throw new IOException("父目录不存在，请填写共享名/文件中转站");checked(r,201,405);}
         e=stat(p);if(e==null||!e.directory)throw new IOException("中转目录不可访问，请检查共享目录路径");
     }
+    /** Atomically create an immutable ledger object; never overwrite an existing key. */
+    public boolean putImmutable(File file,String destination)throws Exception {
+        path(destination,false);
+        try(Response r=request("PUT",url(destination),RequestBody.create(file,MediaType.get("application/octet-stream")),"If-None-Match","*")){
+            if(r.code()==412)return false;checked(r,201,204);return true;
+        }
+    }
     public void upload(File file,String destination,Progress progress)throws Exception {
         path(destination,false);ensure(parent(destination));if(stat(destination)!=null)throw new IOException("远端已有同名文件，未覆盖");
         String temporary=(parent(destination).isEmpty()?"":parent(destination)+"/")+".relay-upload-"+UUID.randomUUID()+".part";
