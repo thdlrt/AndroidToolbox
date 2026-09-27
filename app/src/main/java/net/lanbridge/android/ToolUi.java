@@ -54,12 +54,27 @@ final class ToolUi {
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(a,16);parent.addView(wrap,lp);return e;
     }
     static Intent photoPicker(){return android.os.Build.VERSION.SDK_INT>=33?new Intent(android.provider.MediaStore.ACTION_PICK_IMAGES).setType("image/*"):new Intent(Intent.ACTION_PICK,android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI).setType("image/*");}
-    static Spinner spinner(Context c){
-        Spinner s=new Spinner(c,Spinner.MODE_DROPDOWN);s.setBackgroundTintList(null);
-        GradientDrawable border=box(c,Color.WHITE,12);border.setStroke(dp(c,1),0xffdbe2ee);
-        s.setBackground(border);s.setPadding(dp(c,4),0,dp(c,4),0);s.setMinimumHeight(dp(c,52));
-        s.setPopupBackgroundDrawable(box(c,Color.WHITE,16));s.setDropDownVerticalOffset(dp(c,54));return s;
+    /** Own the popup as well as the field, so OEM Spinner themes cannot recolor it. */
+    static final class Select extends androidx.appcompat.widget.AppCompatSpinner {
+        private androidx.appcompat.widget.ListPopupWindow menu;
+        Select(Context c){super(c,Spinner.MODE_DROPDOWN);setBackgroundTintList(null);setSupportBackgroundTintList(null);
+            GradientDrawable border=box(c,Color.WHITE,12);border.setStroke(dp(c,1),0xffdbe2ee);setBackground(border);setPadding(dp(c,4),0,dp(c,4),0);setMinimumHeight(dp(c,52));}
+        @Override public boolean performClick(){
+            if(!isEnabled()||getAdapter()==null||getAdapter().getCount()==0)return false;
+            if(menu!=null&&menu.isShowing()){menu.dismiss();return true;}
+            Context c=getContext();java.util.List<String> labels=new java.util.ArrayList<>();for(int i=0;i<getAdapter().getCount();i++)labels.add(String.valueOf(getAdapter().getItem(i)));
+            final int selected=getSelectedItemPosition();menu=new androidx.appcompat.widget.ListPopupWindow(c);menu.setAnchorView(this);menu.setModal(true);menu.setWidth(getWidth());menu.setVerticalOffset(dp(c,6));menu.setInputMethodMode(android.widget.PopupWindow.INPUT_METHOD_NOT_NEEDED);
+            GradientDrawable surface=box(c,Color.WHITE,14);surface.setStroke(dp(c,1),0xffe1e7f0);menu.setBackgroundDrawable(surface);
+            menu.setAdapter(new ArrayAdapter<String>(c,android.R.layout.simple_list_item_1,labels){@Override public View getView(int position,View convert,ViewGroup parent){
+                TextView row=text(c,getItem(position),15,position==selected?BLUE:INK);row.setGravity(Gravity.CENTER_VERTICAL);row.setMinHeight(dp(c,52));row.setPadding(dp(c,14),dp(c,12),dp(c,14),dp(c,12));row.setMaxLines(3);row.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                ripple(row,position==selected?0xffedf2ff:Color.WHITE,10);if(position==selected){Icon check=new Icon("check",BLUE);check.setBounds(0,0,dp(c,20),dp(c,20));row.setCompoundDrawables(null,null,check,null);row.setCompoundDrawablePadding(dp(c,12));}return row;}});
+            menu.setOnItemClickListener((parent,view,position,id)->{setSelection(position);menu.dismiss();});menu.show();menu.getListView().setSelector(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));menu.setSelection(selected);return true;
+        }
+        @Override protected void onDetachedFromWindow(){if(menu!=null)menu.dismiss();super.onDetachedFromWindow();}
+        @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){super.onSizeChanged(w,h,oldw,oldh);if(menu!=null&&(w!=oldw||h!=oldh))menu.dismiss();}
+        @Override public boolean onTouchEvent(android.view.MotionEvent event){if(!isEnabled())return false;if(event.getAction()==android.view.MotionEvent.ACTION_UP){performClick();return true;}setPressed(event.getAction()==android.view.MotionEvent.ACTION_DOWN);return true;}
     }
+    static Spinner spinner(Context c){return new Select(c);}
     static ArrayAdapter<String> choices(Context c,String[] values){return choices(c,java.util.Arrays.asList(values));}
     static ArrayAdapter<String> choices(Context c,java.util.List<String> values){return new ArrayAdapter<String>(c,android.R.layout.simple_spinner_item,values){
         private TextView item(int position,boolean drop){TextView t=text(c,getItem(position),15,INK);t.setGravity(Gravity.CENTER_VERTICAL);t.setMinHeight(dp(c,52));t.setPadding(dp(c,12),dp(c,10),dp(c,12),dp(c,10));

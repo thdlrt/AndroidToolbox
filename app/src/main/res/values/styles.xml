@@ -10,6 +10,7 @@
         <item name="colorTertiaryContainer">#EDF2FF</item>
         <item name="colorSecondary">#526582</item>
         <item name="colorSurface">#FFFFFF</item>
+        <item name="colorSurfaceContainerHighest">#E6EBF2</item>
         <item name="colorSurfaceContainerHigh">#FFFFFF</item>
         <item name="colorSurfaceContainer">#F5F7FB</item>
         <item name="colorSurfaceContainerLow">#F5F7FB</item>
@@ -17,6 +18,7 @@
         <item name="colorSurfaceVariant">#F1F4F9</item>
         <item name="colorOnSurfaceVariant">#64748B</item>
         <item name="colorOutline">#D9E1EC</item>
+        <item name="popupMenuStyle">@style/ToolboxPopupMenu</item>
         <item name="materialAlertDialogTheme">@style/ToolboxMaterialDialog</item>
         <item name="android:datePickerDialogTheme">@style/ToolboxDialog</item>
         <item name="android:alertDialogTheme">@style/ToolboxDialog</item>
@@ -42,11 +44,15 @@
     </style>
     <style name="ToolboxMaterialDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
         <item name="colorSurface">#FFFFFF</item>
+        <item name="colorSurfaceContainerHighest">#E6EBF2</item>
         <item name="colorSurfaceContainerHigh">#FFFFFF</item>
         <item name="colorSurfaceContainer">#F5F7FB</item>
         <item name="colorSurfaceContainerLow">#F5F7FB</item>
         <item name="elevationOverlayEnabled">false</item>
         <item name="colorPrimary">#386CF4</item>
         <item name="colorOnSurface">#1D2B41</item>
+    </style>
+    <style name="ToolboxPopupMenu" parent="Widget.AppCompat.PopupMenu">
+        <item name="android:popupBackground">@drawable/dropdown_surface</item>
     </style>
 </resources>

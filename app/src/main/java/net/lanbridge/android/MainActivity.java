@@ -112,6 +112,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         intent.setAction(null);
     }
     @Override protected void onNewIntent(Intent intent) { super.onNewIntent(intent);setIntent(intent);handleIntent(intent); }
+    @Override protected void onStart(){super.onStart();ParcelAutoReader.get(this).opened();}
     @Override protected void onResume() { super.onResume();AppUpdater.get(this).resumeInstall(this);observedSync=DataSyncManager.get(this).lastSuccess;DataSyncManager.get(this).requestAll(DataSyncManager.Trigger.STARTUP);syncHandler.post(syncRefresh); }
     @Override protected void onPause(){syncHandler.removeCallbacks(syncRefresh);super.onPause();}
     @Override protected void onSaveInstanceState(Bundle state) { super.onSaveInstanceState(state);state.putString("page",page);state.putString("connectionReturn",connectionReturn);state.putString("aiReturn",aiReturn); }
