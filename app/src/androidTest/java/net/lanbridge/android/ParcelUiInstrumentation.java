@@ -20,38 +20,41 @@ public final class ParcelUiInstrumentation extends Instrumentation {
     private Spinner spinner(View root,String label){if(root instanceof Spinner&&label.contentEquals(root.getContentDescription()==null?"":root.getContentDescription()))return (Spinner)root;if(root instanceof ViewGroup){ViewGroup group=(ViewGroup)root;for(int i=0;i<group.getChildCount();i++){Spinner found=spinner(group.getChildAt(i),label);if(found!=null)return found;}}return null;}
     private View parcel(){return activity.getFragmentManager().findFragmentByTag("parcel").getView();}
     private View ai(){return activity.getFragmentManager().findFragmentByTag("ai-settings").getView();}
+    private boolean windowText(String text){android.view.accessibility.AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow();return root!=null&&!root.findAccessibilityNodeInfosByText(text).isEmpty();}
+    private void clickWindow(String text){for(int i=0;i<20;i++){android.view.accessibility.AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow();if(root!=null)for(android.view.accessibility.AccessibilityNodeInfo node:root.findAccessibilityNodeInfosByText(text)){android.graphics.Rect bounds=new android.graphics.Rect();node.getBoundsInScreen(bounds);if(!bounds.isEmpty()){long now=android.os.SystemClock.uptimeMillis();getUiAutomation().injectInputEvent(android.view.MotionEvent.obtain(now,now,android.view.MotionEvent.ACTION_DOWN,bounds.centerX(),bounds.centerY(),0),true);getUiAutomation().injectInputEvent(android.view.MotionEvent.obtain(now,now+60,android.view.MotionEvent.ACTION_UP,bounds.centerX(),bounds.centerY(),0),true);android.os.SystemClock.sleep(250);waitForIdleSync();return;}}android.os.SystemClock.sleep(100);}throw new AssertionError("Missing dialog action "+text);}
+    private void screenshot(String name)throws Exception{android.os.SystemClock.sleep(250);android.graphics.Bitmap image=getUiAutomation().takeScreenshot();try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(getTargetContext().getExternalFilesDir(null),"refined-"+name+".png"))){image.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}image.recycle();}
     @Override public void onStart(){Bundle result=new Bundle();JSONObject old=null;boolean enabled=false;try{
         AiSettings settings=new AiSettings(getTargetContext());old=settings.exportSnapshot();enabled=settings.enabled();settings.importSnapshot(new JSONObject().put("format",AiConfigCodec.FORMAT).put("version",1).put("providers",new org.json.JSONArray()).put("roles",new JSONObject()).put("secrets",new JSONObject()),settings.revision());getTargetContext().getSharedPreferences("parcel-local",0).edit().putBoolean("ai_enabled",false).commit();
         activity=(MainActivity)startActivitySync(new Intent(getTargetContext(),MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK).putExtra("page","parcel"));
         main(()->{
-            check(parcel()!=null,"parcel route exists");
-            for(String label:new String[]{"今天","近 2 天","近 3 天","近 7 天","扫描所选日期短信","粘贴短信","选择图片","AI 设置"})check(find(parcel(),label)!=null,"missing control "+label);
-            find(parcel(),"近 7 天").performClick();
-            String from="起始日期："+java.time.LocalDate.now().minusDays(6);check(find(parcel(),from)!=null,"date preset uses calendar days");
-            find(parcel(),"扫描所选日期短信").performClick();
-            check(find(parcel(),"请先在 AI 设置中启用取件 AI 分析")!=null,"scan requires opt-in before reading or sending");
+            check(parcel()!=null,"parcel route exists");check(find(parcel(),"添加取件信息")!=null,"add action exists");check(find(parcel(),"扫描所选日期短信")==null,"imports should be secondary");
             find(parcel(),"AI 设置").performClick();
         });
         main(()->{
-            check(ai()!=null,"AI settings route exists");
-            check(!((CheckBox)find(ai(),"启用取件 AI 分析")).isChecked(),"opt-in remains disabled");
-            for(String label:new String[]{"供应商","服务名称","API 地址","文本模型","图片模型","API Key"})check(find(ai(),label)!=null,"missing AI control "+label);
-            check(find(ai(),"上传已保存的 AI 配置")==null&&find(ai(),"下载 AI 配置")==null,"Independent AI backup panel remains");field(ai(),"服务名称").setText("文本供应商");field(ai(),"API 地址").setText("https://text.fixture.invalid/v1");field(ai(),"API Key").setText("text-secret");
-            find(ai(),"保存供应商").performClick();check(find(ai(),"供应商已保存")!=null,"provider saved locally");check(field(ai(),"API Key").getText().length()==0,"key cleared after save");
-            spinner(ai(),"供应商").setSelection(0);
+            check(ai()!=null,"AI settings route exists");check(find(ai(),"启用取件 AI 分析")==null,"no opt-in switch");check(find(ai(),"文本模型")==null,"no separate text model");
+            for(String label:new String[]{"供应商","服务名称","API 地址","模型 ID","模型供应商","API Key"})check(find(ai(),label)!=null,"missing control "+label);
+            field(ai(),"服务名称").setText("多模态测试");field(ai(),"API 地址").setText("https://vision.fixture.invalid/v1");field(ai(),"API Key").setText("vision-secret");find(ai(),"保存供应商").performClick();
+            check(field(ai(),"API Key").getText().length()==0,"key cleared after save");spinner(ai(),"模型供应商").setSelection(1);field(ai(),"模型 ID").setText("vision-fixture");
         });
         main(()->{
-            field(ai(),"服务名称").setText("图片供应商");field(ai(),"API 地址").setText("https://vision.fixture.invalid/v1");field(ai(),"API Key").setText("vision-secret");find(ai(),"保存供应商").performClick();
-            spinner(ai(),"取件文本供应商").setSelection(1);spinner(ai(),"取件图片供应商").setSelection(2);
-            field(ai(),"文本模型").setText("text-fixture");field(ai(),"图片模型").setText("vision-fixture");find(ai(),"保存功能模型").performClick();
-            check(find(ai(),"功能模型已保存")!=null,"independent roles saved");check(field(ai(),"图片模型").getText().toString().equals("vision-fixture"),"vision model survives reload");
-            try{AiSettings configured=new AiSettings(getTargetContext());ParcelAi.Config text=configured.parcelConfig(false),image=configured.parcelConfig(true);check(text.endpoint.equals("https://text.fixture.invalid/v1"),"text provider routed");check(image.endpoint.equals("https://vision.fixture.invalid/v1"),"image provider routed");check(text.key.equals("text-secret")&&image.key.equals("vision-secret"),"role credentials isolated");check(!configured.enabled(),"save does not enable analysis without opt-in");check(!configured.profiles().toString().contains("text-secret"),"safe profile excludes secret");}catch(Exception e){throw new RuntimeException(e);}
-            ((CheckBox)find(ai(),"启用取件 AI 分析")).setChecked(true);find(ai(),"保存功能模型").performClick();check(new AiSettings(getTargetContext()).enabled(),"explicit opt-in saved");
-            field(ai(),"文本模型").setText("");((CheckBox)find(ai(),"启用取件 AI 分析")).setChecked(false);check(!new AiSettings(getTargetContext()).enabled(),"disable works immediately despite incomplete form");
-            activity.onBackPressed();
-            check(!activity.getFragmentManager().findFragmentByTag("parcel").isHidden(),"back returns to originating parcel page");activity.show("webdav");View backup=activity.getFragmentManager().findFragmentByTag("webdav").getView();check(find(backup,"备份当前配置")!=null&&find(backup,"查看配置备份")!=null,"Unified configuration backup controls missing");
+            find(ai(),"保存功能模型").performClick();check(find(ai(),"功能模型已保存")!=null,"multimodal role saved");
+            try{AiSettings configured=new AiSettings(getTargetContext());ParcelAi.Config text=configured.parcelConfig(false),image=configured.parcelConfig(true);check(text.endpoint.equals(image.endpoint)&&text.model.equals(image.model)&&text.key.equals(image.key),"text and image share one model");check(!configured.profiles().toString().contains("vision-secret"),"safe profiles exclude key");}catch(Exception e){throw new RuntimeException(e);}
+            activity.onBackPressed();check(!activity.getFragmentManager().findFragmentByTag("parcel").isHidden(),"back returns to parcel");
+            find(parcel(),"添加取件信息").performClick();
         });
-        result.putString("stream","PASS: "+assertions+" parcel/AI UI assertions; explicit opt-in, date range, built-in config, independent providers, safe secret handling and back navigation\n");
+        screenshot("add-menu");clickWindow("扫描短信");check(windowText("扫描并分析"),"scan secondary sheet");clickWindow("7 天");check(windowText("起始日期："+java.time.LocalDate.now().minusDays(6)),"date preset uses calendar days");screenshot("scan-dialog");clickWindow("取消");
+        main(()->find(parcel(),"添加取件信息").performClick());clickWindow("粘贴短信");check(windowText("分析并添加"),"single explicit paste action");screenshot("paste-dialog");clickWindow("取消");
+        check(android.os.Build.VERSION.SDK_INT<33?Intent.ACTION_PICK.equals(ToolUi.photoPicker().getAction()):android.provider.MediaStore.ACTION_PICK_IMAGES.equals(ToolUi.photoPicker().getAction()),"gallery picker, not document browser");
+        main(()->{
+            activity.getPreferences(0).edit().putBoolean("favorite.vpn",false).commit();activity.refreshFavorites();View rail=activity.getWindow().getDecorView().findViewWithTag("toolbox-navigation");check(find(rail,"回家 VPN").getVisibility()==View.GONE,"nonfavorite rail hidden");activity.getPreferences(0).edit().remove("favorite.vpn").commit();activity.refreshFavorites();
+            activity.show("ledger");View ledger=activity.getFragmentManager().findFragmentByTag("ledger").getView();check(find(ledger,"立即同步")==null&&find(ledger,"WebDAV 与备份")==null,"no per-tool sync settings");check(find(ledger,"近3月")!=null&&find(ledger,"半年")!=null,"date shortcuts retained");find(ledger,"新建记账").performClick();
+        });
+        check(windowText("新增记账"),"ledger editor opens");screenshot("ledger-editor");clickWindow("取消");
+        main(()->find(activity.getFragmentManager().findFragmentByTag("ledger").getView(),"新建记账").performClick());
+        main(()->{try{LedgerFragment ledger=(LedgerFragment)activity.getFragmentManager().findFragmentByTag("ledger");java.lang.reflect.Field title=LedgerFragment.class.getDeclaredField("title"),amount=LedgerFragment.class.getDeclaredField("amount"),button=LedgerFragment.class.getDeclaredField("commitButton"),draft=LedgerFragment.class.getDeclaredField("draft"),id=LedgerFragment.class.getDeclaredField("editingId");for(java.lang.reflect.Field f:new java.lang.reflect.Field[]{title,amount,button,draft,id})f.setAccessible(true);((EditText)title.get(ledger)).setText("UI 保存验证");((EditText)amount.get(ledger)).setText("18.50");((Button)button.get(ledger)).performClick();check(draft.get(ledger)==null,"successful save closes draft");LedgerStore store=LedgerSync.get(getTargetContext()).store();check(store.entity("entry",(String)id.get(ledger)).getString("title").equals("UI 保存验证"),"entry saved to store");store.patch("entry",(String)id.get(ledger),new JSONObject(),true);LedgerSync.get(getTargetContext()).changed();}catch(Exception e){throw new RuntimeException(e);}});
+        check(!windowText("新增记账"),"successful save dismisses editor window");
+        main(()->activity.show("ai-settings"));main(()->spinner(ai(),"模型供应商").performClick());screenshot("provider-dropdown");sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+        result.putString("stream","PASS: "+assertions+" parcel/AI UI assertions; simplified imports, Material dialogs, shared multimodal role, favorites and ledger controls\n");
         finish(Activity.RESULT_OK,result);
     }catch(Throwable e){result.putString("stream",android.util.Log.getStackTraceString(e));finish(Activity.RESULT_CANCELED,result);}finally{try{if(old!=null)new AiSettings(getTargetContext()).importSnapshot(old,new AiSettings(getTargetContext()).revision());getTargetContext().getSharedPreferences("parcel-local",0).edit().putBoolean("ai_enabled",enabled).commit();}catch(Exception ignored){}}}
 }

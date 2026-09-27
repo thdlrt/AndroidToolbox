@@ -36,10 +36,7 @@ public final class VpnFragment extends ToolFragment {
     }
     private void gap(LinearLayout v,int h) { View spacer=new View(context());v.addView(spacer,new LinearLayout.LayoutParams(1,dp(h))); }
     private EditText input(LinearLayout card,String label,int type,String value) {
-        TextView l=text(label,13,"#52617A");card.addView(l);gap(card,6);
-        EditText field=new EditText(context());field.setTextSize(16);field.setSingleLine(true);field.setInputType(type);field.setText(value);field.setPadding(dp(12),0,dp(12),0);
-        GradientDrawable bg=box("#F7F9FE",12);bg.setStroke(dp(1),Color.parseColor("#E4EAF5"));field.setBackground(bg);
-        card.addView(field,new LinearLayout.LayoutParams(-1,dp(52)));gap(card,16);return field;
+        EditText field=ToolUi.field(context(),card,label,value,type==129);field.setInputType(type);return field;
     }
     private Button button(String label,boolean primary) {
         return ToolUi.button(context(),label,primary,()->{});
@@ -49,15 +46,15 @@ public final class VpnFragment extends ToolFragment {
         ScrollView scroll=new ScrollView(context());scroll.setFillViewport(true);scroll.setBackgroundColor(Color.parseColor("#F3F6FC"));
         LinearLayout root=column();root.setPadding(dp(20),dp(20),dp(20),dp(24));scroll.addView(root);
         LinearLayout heading=ToolUi.header(context(),"回家 VPN",this::closePage);heading.getChildAt(0).setContentDescription("返回工具箱");root.addView(heading);
-        ToolUi.Grid columns=new ToolUi.Grid(context(),300,2,16);root.addView(columns);LinearLayout summary=column(),form=column();columns.addView(form);columns.addView(summary);
-        LinearLayout stateCard=card(summary);status=text("未连接",23,"#1D3157");status.setTypeface(null,Typeface.BOLD);stateCard.addView(status);gap(stateCard,8);details=text("通过 FN Connect 访问家中网络",14,"#637493");stateCard.addView(details);gap(stateCard,14);metrics=text("上传 0 KiB    下载 0 KiB",13,"#637493");stateCard.addView(metrics);
+        ToolUi.Grid columns=new ToolUi.Grid(context(),300,2,16);LinearLayout summary=column(),form=column();columns.addView(form);columns.addView(summary);
+        LinearLayout stateCard=card(root);status=text("未连接",23,"#1D3157");status.setTypeface(null,Typeface.BOLD);stateCard.addView(status);gap(stateCard,8);details=text("通过 FN Connect 访问家中网络",14,"#637493");stateCard.addView(details);gap(stateCard,14);metrics=text("上传 0 KiB    下载 0 KiB",13,"#637493");stateCard.addView(metrics);root.addView(columns);
         error=text("",14,"#B34824");error.setPadding(0,0,0,dp(16));form.addView(error);
         LinearLayout login=card(form);
         origin=input(login,"NAS 地址",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_URI,store.origin());origin.setContentDescription("NAS 地址");origin.setId(501);
         user=input(login,"飞牛管理员",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS,store.username());user.setContentDescription("飞牛管理员");user.setId(502);
         password=input(login,"密码",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD,"");password.setContentDescription("飞牛密码");password.setSaveEnabled(false);
-        TextView scopeLabel=text("代理范围",13,"#52617A");login.addView(scopeLabel);gap(login,6);scope=new Spinner(context());scope.setContentDescription("代理范围");scope.setId(503);
-        ArrayAdapter<String> choices=new ArrayAdapter<>(context(),android.R.layout.simple_spinner_dropdown_item,new String[]{"仅回家 · 访问局域网","全局 TCP · 使用家中网络"});scope.setAdapter(choices);scope.setSelection(store.scope().equals("all")?1:0);login.addView(scope,new LinearLayout.LayoutParams(-1,dp(48)));
+        TextView scopeLabel=text("代理范围",13,"#52617A");login.addView(scopeLabel);gap(login,6);scope=ToolUi.spinner(context());scope.setContentDescription("代理范围");scope.setId(503);
+        ArrayAdapter<String> choices=ToolUi.choices(context(),new String[]{"仅回家 · 访问局域网","全局 TCP · 使用家中网络"});scope.setAdapter(choices);scope.setSelection(store.scope().equals("all")?1:0);login.addView(scope,new LinearLayout.LayoutParams(-1,dp(48)));
         gap(login,10);remember=new CheckBox(context());remember.setId(504);remember.setText("记住登录");remember.setTextSize(14);remember.setChecked(true);login.addView(remember);
         remember.setOnCheckedChangeListener((v,checked)-> { if(!checked) { store.forget();render(); } });
         TextView savedHint=text("密码由 Android Keystore 加密，保存在本机。",12,"#73819B");login.addView(savedHint);gap(login,18);

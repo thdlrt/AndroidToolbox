@@ -11,3 +11,7 @@ https://github.com/square/okio
 https://github.com/JetBrains/kotlin
 
 This is an independent personal client, not an official fnOS/FN Connect app.
+
+Material Components for Android 1.13.0 and AndroidX libraries: Apache License 2.0.
+https://github.com/material-components/material-components-android
+https://android.googlesource.com/platform/frameworks/support

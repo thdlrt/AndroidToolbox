@@ -1,5 +1,27 @@
 <resources>
-    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="AppTheme" parent="Theme.Material3.Light.NoActionBar">
+        <item name="elevationOverlayEnabled">false</item>
+        <item name="colorPrimary">#386CF4</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#EDF2FF</item>
+        <item name="colorOnPrimaryContainer">#24468C</item>
+        <item name="colorSecondaryContainer">#E5EDFF</item>
+        <item name="colorOnSecondaryContainer">#24468C</item>
+        <item name="colorTertiaryContainer">#EDF2FF</item>
+        <item name="colorSecondary">#526582</item>
+        <item name="colorSurface">#FFFFFF</item>
+        <item name="colorSurfaceContainerHigh">#FFFFFF</item>
+        <item name="colorSurfaceContainer">#F5F7FB</item>
+        <item name="colorSurfaceContainerLow">#F5F7FB</item>
+        <item name="colorOnSurface">#1D2B41</item>
+        <item name="colorSurfaceVariant">#F1F4F9</item>
+        <item name="colorOnSurfaceVariant">#64748B</item>
+        <item name="colorOutline">#D9E1EC</item>
+        <item name="materialAlertDialogTheme">@style/ToolboxMaterialDialog</item>
+        <item name="android:datePickerDialogTheme">@style/ToolboxDialog</item>
+        <item name="android:alertDialogTheme">@style/ToolboxDialog</item>
+        <item name="android:colorControlActivated">#386CF4</item>
+        <item name="android:colorControlHighlight">#20386CF4</item>
         <item name="android:fontFamily">sans</item>
         <item name="android:colorAccent">#386CF4</item>
         <item name="android:windowLightStatusBar">true</item>
@@ -7,5 +29,24 @@
         <item name="android:navigationBarColor">#F3F6FC</item>
         <item name="android:windowLightNavigationBar">true</item>
         <item name="android:windowActionModeOverlay">true</item>
+    </style>
+    <style name="ToolboxDialog" parent="android:style/Theme.Material.Light.Dialog.Alert">
+        <item name="android:colorAccent">#386CF4</item>
+        <item name="android:colorControlActivated">#386CF4</item>
+        <item name="android:colorControlHighlight">#20386CF4</item>
+        <item name="android:windowBackground">@drawable/dialog_surface</item>
+        <item name="android:windowMinWidthMajor">80%</item>
+        <item name="android:windowMinWidthMinor">94%</item>
+        <item name="android:textColorPrimary">#1D2B41</item>
+        <item name="android:windowElevation">12dp</item>
+    </style>
+    <style name="ToolboxMaterialDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="colorSurface">#FFFFFF</item>
+        <item name="colorSurfaceContainerHigh">#FFFFFF</item>
+        <item name="colorSurfaceContainer">#F5F7FB</item>
+        <item name="colorSurfaceContainerLow">#F5F7FB</item>
+        <item name="elevationOverlayEnabled">false</item>
+        <item name="colorPrimary">#386CF4</item>
+        <item name="colorOnSurface">#1D2B41</item>
     </style>
 </resources>

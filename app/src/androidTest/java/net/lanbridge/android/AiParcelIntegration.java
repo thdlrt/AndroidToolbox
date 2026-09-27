@@ -19,7 +19,7 @@ public final class AiParcelIntegration extends Instrumentation {
         String id=settings.saveProvider("mobile-fixture","Mobile fixture","openai",host+"/v1","fixture-mobile-key");
         String vid=settings.saveProvider("vision-fixture","Vision fixture","openai",host+"/vision/v1","fixture-vision-key");
         settings.saveRoles(id,"parcel-fixture-model",vid,"vision-fixture-model",true);
-        check(settings.parcelConfig(false).key.equals("fixture-mobile-key"),"text key routed");check(settings.parcelConfig(true).key.equals("fixture-vision-key"),"vision key routed");
+        check(settings.parcelConfig(false).key.equals("fixture-vision-key"),"legacy text uses multimodal provider");check(settings.parcelConfig(true).key.equals("fixture-vision-key"),"vision key routed");
         check(settings.get().getString("vision_model").equals("vision-fixture-model"),"vision form round trip");
         check(!settings.profiles().toString().contains("fixture-mobile-key"),"no key in UI response");
         String oldRevision=settings.revision();settings.saveRoles(id,"parcel-fixture-model",vid,"vision-fixture-model",true);try{settings.importSnapshot(downloaded,oldRevision);throw new AssertionError("stale import accepted");}catch(IOException expected){checks++;}

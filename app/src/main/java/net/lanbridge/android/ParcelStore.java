@@ -36,7 +36,7 @@ public final class ParcelStore extends SQLiteOpenHelper {
 
     /** Validate everything first; on any failure neither rows nor processed markers are committed. */
     public synchronized int ingest(List<ParcelSms.Message> messages,List<ParcelAi.Item> items)throws IOException{
-        ParcelAi.validateItems(messages,items,true);Map<String,ParcelSms.Message> sources=new HashMap<>();for(ParcelSms.Message message:messages)sources.put(message.id,message);SQLiteDatabase db=getWritableDatabase();Set<String> already=new HashSet<>(),touched=new HashSet<>();db.beginTransaction();
+        ParcelAi.validateItems(messages,items,false);Map<String,ParcelSms.Message> sources=new HashMap<>();for(ParcelSms.Message message:messages)sources.put(message.id,message);SQLiteDatabase db=getWritableDatabase();Set<String> already=new HashSet<>(),touched=new HashSet<>();db.beginTransaction();
         try{
             for(ParcelSms.Message message:messages)if(processed(db,message.fingerprint))already.add(message.fingerprint);
             List<ParcelAi.Item> ordered=new ArrayList<>(items);ordered.sort(Comparator.comparingLong(item->eventDate(item,sources)));

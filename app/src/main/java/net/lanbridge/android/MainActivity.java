@@ -1,4 +1,5 @@
 package net.lanbridge.android;
+import androidx.appcompat.app.AlertDialog;
 
 import android.app.*;
 import android.content.*;
@@ -8,12 +9,16 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.*;
 
 /** One window and one navigation rail, with independently retained tool panes. */
-public final class MainActivity extends Activity {
+public final class MainActivity extends androidx.appcompat.app.AppCompatActivity {
     private static final int CONTENT_ID = 0x00ad001;
     private ToolUi.Shell shell;
     private LinearLayout bottom;
     private ImageButton syncButton;private final android.os.Handler syncHandler=new android.os.Handler(android.os.Looper.getMainLooper());
-    private final Runnable syncRefresh=new Runnable(){public void run(){DataSyncManager manager=DataSyncManager.get(MainActivity.this);syncButton.setImageDrawable(new ToolUi.Icon("refresh",manager.running?ToolUi.BLUE:manager.error.isEmpty()?ToolUi.MUTED:0xffb33c3c));syncButton.setTooltipText(manager.summary());syncHandler.postDelayed(this,700);}};
+    private long observedSync=-1;
+    void refreshFavorites(){shell.refreshFavorites();}
+    private final Runnable syncRefresh=new Runnable(){public void run(){DataSyncManager manager=DataSyncManager.get(MainActivity.this);syncButton.setImageDrawable(new ToolUi.Icon("refresh",manager.running?ToolUi.BLUE:manager.error.isEmpty()?ToolUi.MUTED:0xffb33c3c));syncButton.setTooltipText(manager.summary());syncButton.setEnabled(!manager.running);
+        long completed=manager.lastSuccess;if(!manager.running&&manager.error.isEmpty()&&observedSync>=0&&completed>observedSync)Toast.makeText(MainActivity.this,"数据同步完成",Toast.LENGTH_SHORT).show();
+        if(!manager.running)observedSync=completed;syncHandler.postDelayed(this,700);}};
     private String page = "home", connectionReturn = "settings", aiReturn = "settings";
 
     static String pageFor(ComponentName component) {
@@ -33,11 +38,12 @@ public final class MainActivity extends Activity {
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         try{ConfigBackupService.recoverPending(this);}catch(Exception e){Toast.makeText(this,"本机配置恢复未完成，请重试",Toast.LENGTH_LONG).show();}
         LinearLayout body = ToolUi.column(this);
-        LinearLayout globalBar=new LinearLayout(this);globalBar.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);globalBar.setPadding(ToolUi.dp(this,12),0,ToolUi.dp(this,12),0);
-        syncButton=ToolUi.iconButton(this,"refresh","同步数据",()->{DataSyncManager.get(this).requestAll(DataSyncManager.Trigger.MANUAL);Toast.makeText(this,"已请求同步数据",Toast.LENGTH_SHORT).show();});syncButton.setTag("global-data-sync");syncButton.setOnLongClickListener(v->{new AlertDialog.Builder(this).setTitle("数据同步").setMessage(DataSyncManager.get(this).summary()).setPositiveButton("关闭",null).show();return true;});globalBar.addView(syncButton);body.addView(globalBar,new LinearLayout.LayoutParams(-1,ToolUi.dp(this,48)));
+        LinearLayout globalBar=new LinearLayout(this);globalBar.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);globalBar.setPadding(ToolUi.dp(this,12),0,ToolUi.dp(this,12),0);
+        syncButton=ToolUi.iconButton(this,"refresh","同步数据",()->{if(!WebDavSettings.store(this).hasPassword()){show("webdav");return;}DataSyncManager.get(this).requestAll(DataSyncManager.Trigger.MANUAL);});syncButton.setTag("global-data-sync");syncButton.setOnLongClickListener(v->{new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle("数据同步").setMessage(DataSyncManager.get(this).summary()).setPositiveButton("关闭",null).show();return true;});globalBar.addView(syncButton);
         FrameLayout pane = new FrameLayout(this);
         pane.setId(CONTENT_ID);
         body.addView(pane,new LinearLayout.LayoutParams(-1,0,1));
+        body.addView(globalBar,new LinearLayout.LayoutParams(-1,ToolUi.dp(this,48)));
         bottom = new LinearLayout(this);
         body.addView(bottom);
         shell = new ToolUi.Shell(this,body,"home");
@@ -106,7 +112,7 @@ public final class MainActivity extends Activity {
         intent.setAction(null);
     }
     @Override protected void onNewIntent(Intent intent) { super.onNewIntent(intent);setIntent(intent);handleIntent(intent); }
-    @Override protected void onResume() { super.onResume();AppUpdater.get(this).resumeInstall(this);DataSyncManager.get(this).requestAll(DataSyncManager.Trigger.STARTUP);syncHandler.post(syncRefresh); }
+    @Override protected void onResume() { super.onResume();AppUpdater.get(this).resumeInstall(this);observedSync=DataSyncManager.get(this).lastSuccess;DataSyncManager.get(this).requestAll(DataSyncManager.Trigger.STARTUP);syncHandler.post(syncRefresh); }
     @Override protected void onPause(){syncHandler.removeCallbacks(syncRefresh);super.onPause();}
     @Override protected void onSaveInstanceState(Bundle state) { super.onSaveInstanceState(state);state.putString("page",page);state.putString("connectionReturn",connectionReturn);state.putString("aiReturn",aiReturn); }
     void closePage() { show(page.equals("webdav")?connectionReturn:page.equals("ai-settings")?aiReturn:"home"); }

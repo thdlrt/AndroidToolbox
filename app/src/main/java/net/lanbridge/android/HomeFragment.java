@@ -1,4 +1,5 @@
 package net.lanbridge.android;
+import androidx.appcompat.app.AlertDialog;
 
 import android.app.*;
 import android.content.*;
@@ -39,7 +40,7 @@ public final class HomeFragment extends ToolFragment {
 
         TextView title=text(id.equals("settings")?"设置":id.equals("tools")?"全部工具":"工具首页",26);title.setTypeface(null,Typeface.BOLD);content.addView(title);
         if(id.equals("settings")){settings();return;}
-        TextView subtitle=text(id.equals("tools")?"选择常用工具，打造自己的工具箱":"日常所需，随手可用",14);subtitle.setTextColor(ToolUi.MUTED);content.addView(subtitle);
+        TextView subtitle=text(id.equals("tools")?"勾选后显示在首页和侧边栏":"常用工具",14);subtitle.setTextColor(ToolUi.MUTED);content.addView(subtitle);
         ToolUi.Grid grid=new ToolUi.Grid(context(),156,3,12);ToolUi.space(content,grid);
         for(ToolRegistry.Tool tool:ToolRegistry.TOOLS){
             boolean favorite=getPreferences(0).getBoolean("favorite."+tool.id,true);
@@ -51,7 +52,7 @@ public final class HomeFragment extends ToolFragment {
             TextView detail=text(description,12);detail.setTextColor(ToolUi.MUTED);detail.setPadding(0,0,0,0);c.addView(detail);
             if(tool.id.equals("vpn")){vpnState=text("未连接",12);vpnState.setTextColor(color);vpnState.setPadding(0,dp(6),0,0);c.addView(vpnState);}
             ToolUi.ripple(c,Color.WHITE,20);c.setFocusable(true);c.setContentDescription("打开"+tool.name);c.setOnClickListener(v->startActivity(new Intent(context(),tool.activity)));
-            if(id.equals("tools")){CheckBox pin=new CheckBox(context());pin.setText("常用工具");pin.setTextSize(12);pin.setMinHeight(dp(48));pin.setChecked(favorite);c.addView(pin);pin.setOnCheckedChangeListener((v,on)->{synchronized(ConfigBackupService.CONFIG_LOCK){getPreferences(0).edit().putBoolean("favorite."+tool.id,on).commit();}});}
+            if(id.equals("tools")){CheckBox pin=new CheckBox(context());pin.setText("常用工具");pin.setTextSize(12);pin.setMinHeight(dp(48));pin.setChecked(favorite);c.addView(pin);pin.setOnCheckedChangeListener((v,on)->{synchronized(ConfigBackupService.CONFIG_LOCK){getPreferences(0).edit().putBoolean("favorite."+tool.id,on).commit();((MainActivity)context()).refreshFavorites();}});}
             grid.addView(c);
         }
         if(grid.getChildCount()==0){LinearLayout empty=card();empty.addView(text("暂无常用工具",18));button(empty,"选择常用工具",()->navigate("tools"));}
@@ -65,8 +66,8 @@ public final class HomeFragment extends ToolFragment {
     private void settings(){
         try{WebDavSettings.migrate(context());}catch(Exception e){Toast.makeText(context(),e.getMessage(),1).show();}
         LoginStore shared=WebDavSettings.store(context());
-        settingRow("cloud","WebDAV 与备份",shared.hasPassword()?"已配置 · 统一连接与同步":"统一连接、自动同步和配置备份",()->startActivity(new Intent(context(),WebDavActivity.class)));
-        settingRow("ai","AI 设置","供应商、功能模型与密钥同步",()->startActivity(new Intent(context(),AiSettingsActivity.class)));
+        settingRow("cloud","WebDAV 与备份",shared.hasPassword()?"已配置 · 统一连接与同步":"连接设置与配置备份",()->startActivity(new Intent(context(),WebDavActivity.class)));
+        settingRow("ai","AI 设置","供应商与多模态模型",()->startActivity(new Intent(context(),AiSettingsActivity.class)));
         TextView about=text("关于应用",14);about.setTextColor(ToolUi.MUTED);about.setPadding(0,dp(24),0,dp(12));content.addView(about);
         LinearLayout c=card();c.addView(text("应用更新",20));c.addView(text("安卓工具箱 "+BuildConfig.VERSION_NAME,15));
         updateState=text(AppUpdater.get(context()).message,14);c.addView(updateState);
@@ -74,8 +75,8 @@ public final class HomeFragment extends ToolFragment {
         c.addView(text("从 GitHub Releases 获取正式版。下载后校验 SHA-256、包名和签名，再由系统确认安装。",13));
         LinearLayout links=card();button(links,"项目源码与发行版",()->startActivity(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(AppUpdater.REPOSITORY))));
         button(links,"第三方许可",()->{
-            try{String[] names=getAssets().list("licenses");new AlertDialog.Builder(context()).setTitle("第三方许可").setItems(names,(dialog,index)->{
-                try(java.io.InputStream in=getAssets().open("licenses/"+names[index])){String body=Streams.text(in,1048576);new AlertDialog.Builder(context()).setTitle(names[index]).setMessage(body).setPositiveButton("关闭",null).show();}catch(Exception e){Toast.makeText(context(),e.getMessage(),Toast.LENGTH_LONG).show();}
+            try{String[] names=getAssets().list("licenses");new com.google.android.material.dialog.MaterialAlertDialogBuilder(context()).setTitle("第三方许可").setItems(names,(dialog,index)->{
+                try(java.io.InputStream in=getAssets().open("licenses/"+names[index])){String body=Streams.text(in,1048576);new com.google.android.material.dialog.MaterialAlertDialogBuilder(context()).setTitle(names[index]).setMessage(body).setPositiveButton("关闭",null).show();}catch(Exception e){Toast.makeText(context(),e.getMessage(),Toast.LENGTH_LONG).show();}
             }).setNegativeButton("关闭",null).show();}catch(Exception e){Toast.makeText(context(),e.getMessage(),Toast.LENGTH_LONG).show();}
         });
     }

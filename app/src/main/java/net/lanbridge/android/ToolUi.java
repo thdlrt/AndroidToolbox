@@ -30,12 +30,43 @@ final class ToolUi {
     }
     static GradientDrawable box(Context c,int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(c,radius));return d;}
     static TextView text(Context c,String s,int size,int color){TextView t=new TextView(c);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setFontFeatureSettings("kern");return t;}
+    static TextView badge(Context c,String label,int color){TextView t=text(c,label,12,color);t.setPadding(dp(c,9),dp(c,4),dp(c,9),dp(c,4));t.setBackground(box(c,(color&0xffffff)|0x14000000,8));return t;}
     static void update(TextView view,String value){if(!android.text.TextUtils.equals(view.getText(),value))view.setText(value);}
     static void ripple(View v,int color,int radius){v.setBackground(new RippleDrawable(ColorStateList.valueOf(0x20386CF4),box(v.getContext(),color,radius),null));}
-    static Button button(Context c,String label,boolean primary,Runnable action){Button b=new Button(c);b.setAllCaps(false);b.setText(label);b.setTextSize(14);b.setTextColor(primary?Color.WHITE:BLUE);b.setMinHeight(dp(c,48));b.setMinimumHeight(dp(c,48));b.setPadding(dp(c,12),dp(c,10),dp(c,12),dp(c,10));LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,-2);bp.topMargin=dp(c,8);b.setLayoutParams(bp);b.setStateListAnimator(null);ripple(b,primary?BLUE:0xffedf2ff,14);b.setOnClickListener(v->action.run());return b;}
+    static Button button(Context c,String label,boolean primary,Runnable action){
+        com.google.android.material.button.MaterialButton b=new com.google.android.material.button.MaterialButton(c);
+        b.setAllCaps(false);b.setText(label);b.setTextSize(14);b.setTextColor(primary?Color.WHITE:BLUE);
+        b.setMinHeight(dp(c,48));b.setMinimumHeight(dp(c,48));b.setInsetTop(0);b.setInsetBottom(0);b.setCornerRadius(dp(c,14));
+        b.setPadding(dp(c,16),dp(c,10),dp(c,16),dp(c,10));b.setBackgroundTintList(new ColorStateList(new int[][]{new int[]{-android.R.attr.state_enabled},new int[]{}},new int[]{0xffe5eaf3,primary?BLUE:0xffedf2ff}));
+        b.setRippleColor(ColorStateList.valueOf(0x20386cf4));b.setElevation(0);b.setStateListAnimator(null);
+        LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,-2);bp.topMargin=dp(c,8);b.setLayoutParams(bp);b.setOnClickListener(v->action.run());return b;
+    }
     static ImageButton iconButton(Context c,String icon,String label,Runnable action){ImageButton b=new ImageButton(c);b.setImageDrawable(new Icon(icon,INK));b.setContentDescription(label);b.setTooltipText(label);b.setPadding(dp(c,12),dp(c,12),dp(c,12),dp(c,12));ripple(b,Color.TRANSPARENT,14);b.setOnClickListener(v->action.run());b.setLayoutParams(new LinearLayout.LayoutParams(dp(c,48),dp(c,48)));return b;}
     static ImageView icon(Context c,String name,int color){ImageView v=new ImageView(c);v.setImageDrawable(new Icon(name,color));v.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);return v;}
-    static EditText field(Activity a,LinearLayout parent,String label,String value,boolean secret){TextView title=text(a,label,13,MUTED);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(-1,-2);tp.topMargin=dp(a,20);tp.bottomMargin=dp(a,8);parent.addView(title,tp);EditText e=new EditText(a);e.setSingleLine(true);e.setTextSize(16);e.setContentDescription(label);e.setText(value);e.setPadding(dp(a,14),0,dp(a,14),0);e.setInputType(secret?129:1);e.setSaveEnabled(!secret);e.setBackground(box(a,0xffedf1f7,12));parent.addView(e,new LinearLayout.LayoutParams(-1,dp(a,52)));return e;}
+    static EditText field(Activity a,LinearLayout parent,String label,String value,boolean secret){
+        com.google.android.material.textfield.TextInputLayout wrap=new com.google.android.material.textfield.TextInputLayout(a,null,com.google.android.material.R.attr.textInputOutlinedStyle);
+        wrap.setHint(label);wrap.setExpandedHintEnabled(false);wrap.setBoxBackgroundMode(com.google.android.material.textfield.TextInputLayout.BOX_BACKGROUND_OUTLINE);
+        wrap.setBoxCornerRadii(dp(a,12),dp(a,12),dp(a,12),dp(a,12));wrap.setBoxStrokeColor(BLUE);
+        com.google.android.material.textfield.TextInputEditText e=new com.google.android.material.textfield.TextInputEditText(wrap.getContext());
+        e.setSingleLine(true);e.setTextSize(16);e.setTextColor(INK);e.setContentDescription(label);e.setInputType(secret?129:1);e.setSaveEnabled(!secret);e.setText(value);
+        e.setPadding(dp(a,14),dp(a,16),dp(a,14),dp(a,16));wrap.addView(e,new LinearLayout.LayoutParams(-1,-2));
+        if(secret)wrap.setEndIconMode(com.google.android.material.textfield.TextInputLayout.END_ICON_PASSWORD_TOGGLE);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(a,16);parent.addView(wrap,lp);return e;
+    }
+    static Intent photoPicker(){return android.os.Build.VERSION.SDK_INT>=33?new Intent(android.provider.MediaStore.ACTION_PICK_IMAGES).setType("image/*"):new Intent(Intent.ACTION_PICK,android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI).setType("image/*");}
+    static Spinner spinner(Context c){
+        Spinner s=new Spinner(c,Spinner.MODE_DROPDOWN);s.setBackgroundTintList(null);
+        GradientDrawable border=box(c,Color.WHITE,12);border.setStroke(dp(c,1),0xffdbe2ee);
+        s.setBackground(border);s.setPadding(dp(c,4),0,dp(c,4),0);s.setMinimumHeight(dp(c,52));
+        s.setPopupBackgroundDrawable(box(c,Color.WHITE,16));s.setDropDownVerticalOffset(dp(c,54));return s;
+    }
+    static ArrayAdapter<String> choices(Context c,String[] values){return choices(c,java.util.Arrays.asList(values));}
+    static ArrayAdapter<String> choices(Context c,java.util.List<String> values){return new ArrayAdapter<String>(c,android.R.layout.simple_spinner_item,values){
+        private TextView item(int position,boolean drop){TextView t=text(c,getItem(position),15,INK);t.setGravity(Gravity.CENTER_VERTICAL);t.setMinHeight(dp(c,52));t.setPadding(dp(c,12),dp(c,10),dp(c,12),dp(c,10));
+            if(!drop){Icon arrow=new Icon("chevron",MUTED);arrow.setBounds(0,0,dp(c,18),dp(c,18));t.setCompoundDrawables(null,null,arrow,null);t.setCompoundDrawablePadding(dp(c,8));}return t;}
+        @Override public View getView(int position,View convert,ViewGroup parent){return item(position,false);}
+        @Override public View getDropDownView(int position,View convert,ViewGroup parent){return item(position,true);}
+    };}
     static final class Shell extends LinearLayout {
         private final MainActivity activity;
         private final LinearLayout rail;
@@ -68,7 +99,9 @@ final class ToolUi {
             for(LinearLayout row:rows.values()){row.setOrientation(expanded?HORIZONTAL:VERTICAL);row.setGravity(expanded?Gravity.CENTER_VERTICAL:Gravity.CENTER);row.setPadding(dp(activity,expanded?12:2),dp(activity,8),dp(activity,expanded?8:2),dp(activity,8));TextView label=(TextView)row.getChildAt(1);label.setTextSize(expanded?14:11);label.setGravity(expanded?Gravity.START:Gravity.CENTER);label.setPadding(dp(activity,expanded?12:0),dp(activity,expanded?0:5),0,0);row.getLayoutParams().height=LayoutParams.WRAP_CONTENT;row.setMinimumHeight(dp(activity,expanded?56:72));}
             if(bottom!=null)bottom.setVisibility(wide||!bottomEnabled?GONE:VISIBLE);
         }
+        void refreshFavorites(){for(String[] item:items){boolean tool=!java.util.Arrays.asList("home","tools","settings").contains(item[0]);rows.get(item[0]).setVisibility(!tool||activity.getPreferences(0).getBoolean("favorite."+item[0],true)?VISIBLE:GONE);}}
         void selected(String value){
+            refreshFavorites();
             selected=value;
             for(String[] item:items){LinearLayout row=rows.get(item[0]);boolean on=selected.equals(item[0]);row.setSelected(on);ripple(row,on?0xffdfe8ff:Color.TRANSPARENT,14);((ImageView)row.getChildAt(0)).setImageDrawable(new Icon(item[2],on?BLUE:MUTED));((TextView)row.getChildAt(1)).setTextColor(on?BLUE:INK);}
         }
@@ -93,6 +126,9 @@ final class ToolUi {
             case "upload":line(c,12,16,12,3);line(c,7,8,12,3,17,8);line(c,4,15,4,21,20,21,20,15);break;
             case "download":line(c,12,3,12,16);line(c,7,11,12,16,17,11);line(c,4,17,4,21,20,21,20,17);break;
             case "more":paint.setStyle(Paint.Style.FILL);for(int y:new int[]{5,12,19})c.drawCircle(12,y,1.5f,paint);paint.setStyle(Paint.Style.STROKE);break;
+            case "copy":line(c,8,7,21,7,21,21,8,21,8,7);line(c,16,3,3,3,3,17);break;
+            case "plus":line(c,12,5,12,19);line(c,5,12,19,12);break;
+            case "chevron":line(c,6,9,12,15,18,9);break;
             case "back":line(c,15,5,8,12,15,19);break;
             case "close":line(c,6,6,18,18);line(c,18,6,6,18);break;
             case "search":c.drawCircle(10,10,6,paint);line(c,15,15,21,21);break;
