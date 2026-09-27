@@ -12,7 +12,7 @@ public final class MainActivity extends Activity {
     private static final int CONTENT_ID = 0x00ad001;
     private ToolUi.Shell shell;
     private LinearLayout bottom;
-    private String page = "home", connectionReturn = "settings";
+    private String page = "home", connectionReturn = "settings", aiReturn = "settings";
 
     static String pageFor(ComponentName component) {
         if (component == null) return null;
@@ -22,6 +22,8 @@ public final class MainActivity extends Activity {
         if (name.equals(WebDavActivity.class.getName())) return "webdav";
         if (name.equals(LedgerActivity.class.getName())) return "ledger";
         if (name.equals(DiagnosticsActivity.class.getName())) return "diagnostics";
+        if (name.equals(ParcelActivity.class.getName())) return "parcel";
+        if (name.equals(AiSettingsActivity.class.getName())) return "ai-settings";
         return null;
     }
     @Override public void onCreate(Bundle state) {
@@ -39,16 +41,18 @@ public final class MainActivity extends Activity {
         if (state != null) {
             page = state.getString("page","home");
             connectionReturn = state.getString("connectionReturn","settings");
+            aiReturn = state.getString("aiReturn","settings");
             show(page,false,null);
         } else handleIntent(getIntent());
     }
     void show(String id) { show(id,true,null); }
     private void show(String id,boolean animate,Intent incoming) {
-        if (!java.util.Arrays.asList("home","tools","settings","relay","vpn","webdav","ledger","diagnostics").contains(id)) id="home";
+        if (!java.util.Arrays.asList("home","tools","settings","relay","vpn","webdav","ledger","diagnostics","parcel","ai-settings").contains(id)) id="home";
         FragmentManager manager = getFragmentManager();
         ToolFragment next = (ToolFragment)manager.findFragmentByTag(id);
         boolean changed = !page.equals(id);
         if (id.equals("webdav") && changed) connectionReturn = page;
+        if (id.equals("ai-settings") && changed) aiReturn = page;
         if (changed) {
             View focus = getCurrentFocus();
             if (focus != null) {
@@ -62,7 +66,7 @@ public final class MainActivity extends Activity {
         for (Fragment fragment : manager.getFragments())
             if (fragment != next && !fragment.isHidden()) transaction.hide(fragment);
         if (next == null) {
-            next = id.equals("ledger") ? new LedgerFragment() : id.equals("diagnostics") ? new DiagnosticsFragment() : id.equals("relay") ? new RelayFragment() : id.equals("vpn") ? new VpnFragment() : id.equals("webdav") ? new WebDavFragment() : new HomeFragment();
+            next = id.equals("parcel") ? new ParcelFragment() : id.equals("ai-settings") ? new AiSettingsFragment() : id.equals("ledger") ? new LedgerFragment() : id.equals("diagnostics") ? new DiagnosticsFragment() : id.equals("relay") ? new RelayFragment() : id.equals("vpn") ? new VpnFragment() : id.equals("webdav") ? new WebDavFragment() : new HomeFragment();
             Bundle arguments = new Bundle();arguments.putString("page",id);
             arguments.putParcelable("incoming",incoming == null ? new Intent() : new Intent(incoming));
             next.setArguments(arguments);
@@ -73,7 +77,7 @@ public final class MainActivity extends Activity {
         }
         page = id;
         transaction.commitNow();
-        shell.selected(page.equals("webdav") ? "settings" : page);
+        shell.selected((page.equals("webdav") || page.equals("ai-settings")) ? "settings" : page);
         renderBottom();
     }
     private void renderBottom() {
@@ -98,8 +102,8 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onNewIntent(Intent intent) { super.onNewIntent(intent);setIntent(intent);handleIntent(intent); }
     @Override protected void onResume() { super.onResume();AppUpdater.get(this).resumeInstall(this);LedgerSync.get(this).sync(); }
-    @Override protected void onSaveInstanceState(Bundle state) { super.onSaveInstanceState(state);state.putString("page",page);state.putString("connectionReturn",connectionReturn); }
-    void closePage() { show(page.equals("webdav")?connectionReturn:"home"); }
+    @Override protected void onSaveInstanceState(Bundle state) { super.onSaveInstanceState(state);state.putString("page",page);state.putString("connectionReturn",connectionReturn);state.putString("aiReturn",aiReturn); }
+    void closePage() { show(page.equals("webdav")?connectionReturn:page.equals("ai-settings")?aiReturn:"home"); }
     @Override public void onBackPressed() {
         ToolFragment active=(ToolFragment)getFragmentManager().findFragmentByTag(page);
         if(active!=null&&active.back())return;

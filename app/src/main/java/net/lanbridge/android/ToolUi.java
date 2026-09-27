@@ -28,7 +28,7 @@ final class ToolUi {
         private String selected;
         private boolean wide, bottomEnabled=true;
         private final java.util.Map<String,LinearLayout> rows=new java.util.LinkedHashMap<>();
-        private final String[][] items={{"home","首页","home"},{"relay","文件中转站","folder"},{"vpn","回家 VPN","shield"},{"ledger","项目记账","file"},{"diagnostics","网络诊断","search"},{"tools","全部工具","grid"},{"settings","设置","settings"}};
+        private final String[][] items={{"home","首页","home"},{"relay","文件中转站","folder"},{"vpn","回家 VPN","shield"},{"ledger","项目记账","file"},{"diagnostics","网络诊断","search"},{"parcel","取件助手","file"},{"tools","全部工具","grid"},{"settings","设置","settings"}};
         Shell(MainActivity a,View body,String selected){
             super(a);activity=a;this.selected=selected;setOrientation(HORIZONTAL);setBackgroundColor(BG);
             rail=column(a);rail.setTag("toolbox-navigation");rail.setPadding(dp(a,16),dp(a,24),dp(a,16),dp(a,20));rail.setBackgroundColor(0xffedf1f8);
