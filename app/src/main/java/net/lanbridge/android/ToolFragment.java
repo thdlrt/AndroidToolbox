@@ -16,7 +16,9 @@ abstract class ToolFragment extends Fragment {
     @Override public void onAttach(Context context) { super.onAttach(context); host = (Activity) context; }
     final Activity context() { return host; }
     protected abstract View createContent(Bundle state);
-    @Override public final View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle state) { return createContent(state); }
+    @Override public final View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle state) { View content=createContent(state);android.widget.FrameLayout frame=new android.widget.FrameLayout(context()){
+        @Override protected void onMeasure(int w,int h){int width=MeasureSpec.getSize(w);int gutter=Math.max(0,(width-ToolUi.dp(getContext(),1120))/2);setPadding(gutter,0,gutter,0);super.onMeasure(w,h);}
+    };frame.setBackgroundColor(ToolUi.BG);frame.addView(content,new android.widget.FrameLayout.LayoutParams(-1,-1));return frame; }
     // Native Fragment hide/show does not pause a fragment. Poll only the visible page.
     private void updateActive() {
         boolean next = isResumed() && !isHidden() && getView() != null;

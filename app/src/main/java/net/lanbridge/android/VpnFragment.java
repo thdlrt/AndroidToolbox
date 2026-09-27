@@ -48,12 +48,11 @@ public final class VpnFragment extends ToolFragment {
         store=new LoginStore(context());context().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         ScrollView scroll=new ScrollView(context());scroll.setFillViewport(true);scroll.setBackgroundColor(Color.parseColor("#F3F6FC"));
         LinearLayout root=column();root.setPadding(dp(20),dp(20),dp(20),dp(24));scroll.addView(root);
-        root.addView(ToolUi.iconButton(context(),"back","返回工具箱",this::closePage));gap(root,16);
-        LinearLayout heading=new LinearLayout(context());heading.setGravity(Gravity.CENTER_VERTICAL);ImageView icon=ToolUi.icon(context(),"shield",ToolUi.BLUE);heading.addView(icon,new LinearLayout.LayoutParams(dp(36),dp(36)));
-        TextView title=text("回家 VPN",25,"#182640");title.setTypeface(null,Typeface.BOLD);LinearLayout.LayoutParams titleParams=new LinearLayout.LayoutParams(-2,-2);titleParams.leftMargin=dp(12);heading.addView(title,titleParams);root.addView(heading);gap(root,24);
-        LinearLayout stateCard=card(root);status=text("未连接",23,"#1D3157");status.setTypeface(null,Typeface.BOLD);stateCard.addView(status);gap(stateCard,8);details=text("通过 FN Connect 访问家中网络",14,"#637493");stateCard.addView(details);gap(stateCard,14);metrics=text("上传 0 KiB    下载 0 KiB",13,"#637493");stateCard.addView(metrics);
-        error=text("",14,"#B34824");error.setPadding(0,0,0,dp(16));root.addView(error);
-        LinearLayout login=card(root);
+        LinearLayout heading=ToolUi.header(context(),"回家 VPN",this::closePage);heading.getChildAt(0).setContentDescription("返回工具箱");root.addView(heading);
+        ToolUi.Grid columns=new ToolUi.Grid(context(),300,2,16);root.addView(columns);LinearLayout summary=column(),form=column();columns.addView(form);columns.addView(summary);
+        LinearLayout stateCard=card(summary);status=text("未连接",23,"#1D3157");status.setTypeface(null,Typeface.BOLD);stateCard.addView(status);gap(stateCard,8);details=text("通过 FN Connect 访问家中网络",14,"#637493");stateCard.addView(details);gap(stateCard,14);metrics=text("上传 0 KiB    下载 0 KiB",13,"#637493");stateCard.addView(metrics);
+        error=text("",14,"#B34824");error.setPadding(0,0,0,dp(16));form.addView(error);
+        LinearLayout login=card(form);
         origin=input(login,"NAS 地址",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_URI,store.origin());origin.setContentDescription("NAS 地址");origin.setId(501);
         user=input(login,"飞牛管理员",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS,store.username());user.setContentDescription("飞牛管理员");user.setId(502);
         password=input(login,"密码",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD,"");password.setContentDescription("飞牛密码");password.setSaveEnabled(false);
@@ -64,10 +63,10 @@ public final class VpnFragment extends ToolFragment {
         TextView savedHint=text("密码由 Android Keystore 加密，保存在本机。",12,"#73819B");login.addView(savedHint);gap(login,18);
         connect=button("连接",true);login.addView(connect,new LinearLayout.LayoutParams(-1,dp(52)));connect.setOnClickListener(v->connect());
         gap(login,12);forget=button("清除已保存密码",false);login.addView(forget,new LinearLayout.LayoutParams(-1,dp(44)));forget.setOnClickListener(v->{store.forget();password.setText("");render();});
-        LinearLayout testing=card(root);probe=button("测试回家连接",false);testing.addView(probe,new LinearLayout.LayoutParams(-1,dp(48)));probe.setOnClickListener(v->startService(new Intent(context(),BridgeVpnService.class).setAction(BridgeVpnService.PROBE)));
+        LinearLayout testing=card(summary);probe=button("测试回家连接",false);testing.addView(probe,new LinearLayout.LayoutParams(-1,dp(48)));probe.setOnClickListener(v->startService(new Intent(context(),BridgeVpnService.class).setAction(BridgeVpnService.PROBE)));
         gap(testing,12);probeResult=text("",13,"#52617A");testing.addView(probeResult);
-        TextView note=text("首次连接需确认 Android VPN 授权。全局模式支持 TCP；普通 UDP、QUIC 和 IPv6 暂不支持。开启后可切换应用，通知栏可直接断开。",13,"#73819B");root.addView(note);gap(root,16);
-        TextView version=text(BuildConfig.VERSION_NAME+" · Android 10+",12,"#64748B");root.addView(version);return scroll;
+        TextView note=text("首次连接需确认 Android VPN 授权。全局模式支持 TCP；普通 UDP、QUIC 和 IPv6 暂不支持。开启后可切换应用，通知栏可直接断开。",13,"#73819B");summary.addView(note);gap(summary,16);
+        TextView version=text(BuildConfig.VERSION_NAME+" · Android 10+",12,"#64748B");summary.addView(version);return scroll;
     }
     private void showError(String text) { ToolUi.update(error,text);error.setVisibility(View.VISIBLE); }
     private void connect() {

@@ -89,7 +89,7 @@ public final class MainActivity extends Activity {
             boolean selected=page.equals(item[0]);
             ToolUi.ripple(button,selected?0xffedf2ff:android.graphics.Color.WHITE,16);
             button.addView(ToolUi.icon(this,item[2],selected?ToolUi.BLUE:ToolUi.MUTED),new LinearLayout.LayoutParams(ToolUi.dp(this,23),ToolUi.dp(this,23)));
-            TextView label=ToolUi.text(this,item[1],12,selected?ToolUi.BLUE:ToolUi.MUTED);label.setPadding(0,ToolUi.dp(this,5),0,0);button.addView(label);
+            TextView label=ToolUi.text(this,item[1],12,selected?ToolUi.BLUE:ToolUi.MUTED);label.setGravity(Gravity.CENTER);label.setPadding(0,ToolUi.dp(this,5),0,0);button.addView(label);
             button.setContentDescription(item[1]);button.setFocusable(true);button.setOnClickListener(v->show(item[0]));
             bottom.addView(button,new LinearLayout.LayoutParams(0,ToolUi.dp(this,68),1));
         }
