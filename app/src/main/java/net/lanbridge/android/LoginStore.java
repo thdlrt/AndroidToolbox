@@ -29,15 +29,15 @@ public final class LoginStore {
     public String username() { return preferences.getString("username",""); }
     public String revision() { return preferences.getString("revision",""); }
     public String scope() { return preferences.getString("scope","lan"); }
-    public void config(String origin,String username,String scope) { preferences.edit().putString("origin",origin).putString("username",username).putString("scope",scope).apply(); }
-    public void save(String origin,String username,String password,String scope) throws Exception {
+    public void config(String origin,String username,String scope) { synchronized(ConfigBackupService.CONFIG_LOCK){if(!preferences.edit().putString("origin",origin).putString("username",username).putString("scope",scope).commit())throw new IllegalStateException("无法保存本机配置");} }
+    public void save(String origin,String username,String password,String scope) throws Exception { synchronized(ConfigBackupService.CONFIG_LOCK){
         Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.ENCRYPT_MODE,key());
         byte[] plain=new JSONObject().put("origin",origin).put("username",username).put("password",password).toString().getBytes(StandardCharsets.UTF_8);
         byte[] encrypted=cipher.doFinal(plain);
-        preferences.edit().putString("origin",origin).putString("username",username).putString("scope",scope).putString("revision",java.util.UUID.randomUUID().toString())
-            .putString("iv",Base64.getEncoder().encodeToString(cipher.getIV())).putString("cipher",Base64.getEncoder().encodeToString(encrypted)).apply();
-        java.util.Arrays.fill(plain,(byte)0);
-    }
+        boolean saved=preferences.edit().putString("origin",origin).putString("username",username).putString("scope",scope).putString("revision",java.util.UUID.randomUUID().toString())
+            .putString("iv",Base64.getEncoder().encodeToString(cipher.getIV())).putString("cipher",Base64.getEncoder().encodeToString(encrypted)).commit();
+        java.util.Arrays.fill(plain,(byte)0);if(!saved)throw new java.io.IOException("无法保存本机凭据");
+    }}
     public String password(String origin,String username) throws Exception {
         if(!hasPassword()) return "";
         Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");
@@ -46,5 +46,5 @@ public final class LoginStore {
         JSONObject value=new JSONObject(new String(bytes,StandardCharsets.UTF_8));java.util.Arrays.fill(bytes,(byte)0);
         return origin.equals(value.getString("origin")) && username.equals(value.getString("username"))?value.getString("password"):"";
     }
-    public void forget() { preferences.edit().remove("iv").remove("cipher").apply(); }
+    public void forget() { synchronized(ConfigBackupService.CONFIG_LOCK){if(!preferences.edit().remove("iv").remove("cipher").commit())throw new IllegalStateException("无法清除本机凭据");} }
 }

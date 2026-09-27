@@ -51,7 +51,7 @@ public final class HomeFragment extends ToolFragment {
             TextView detail=text(description,12);detail.setTextColor(ToolUi.MUTED);detail.setPadding(0,0,0,0);c.addView(detail);
             if(tool.id.equals("vpn")){vpnState=text("未连接",12);vpnState.setTextColor(color);vpnState.setPadding(0,dp(6),0,0);c.addView(vpnState);}
             ToolUi.ripple(c,Color.WHITE,20);c.setFocusable(true);c.setContentDescription("打开"+tool.name);c.setOnClickListener(v->startActivity(new Intent(context(),tool.activity)));
-            if(id.equals("tools")){CheckBox pin=new CheckBox(context());pin.setText("常用工具");pin.setTextSize(12);pin.setMinHeight(dp(48));pin.setChecked(favorite);c.addView(pin);pin.setOnCheckedChangeListener((v,on)->getPreferences(0).edit().putBoolean("favorite."+tool.id,on).apply());}
+            if(id.equals("tools")){CheckBox pin=new CheckBox(context());pin.setText("常用工具");pin.setTextSize(12);pin.setMinHeight(dp(48));pin.setChecked(favorite);c.addView(pin);pin.setOnCheckedChangeListener((v,on)->{synchronized(ConfigBackupService.CONFIG_LOCK){getPreferences(0).edit().putBoolean("favorite."+tool.id,on).commit();}});}
             grid.addView(c);
         }
         if(grid.getChildCount()==0){LinearLayout empty=card();empty.addView(text("暂无常用工具",18));button(empty,"选择常用工具",()->navigate("tools"));}

@@ -35,8 +35,8 @@ public final class ParcelUiInstrumentation extends Instrumentation {
         main(()->{
             check(ai()!=null,"AI settings route exists");
             check(!((CheckBox)find(ai(),"启用取件 AI 分析")).isChecked(),"opt-in remains disabled");
-            for(String label:new String[]{"供应商","服务名称","API 地址","文本模型","图片模型","API Key","上传已保存的 AI 配置","下载 AI 配置"})check(find(ai(),label)!=null,"missing AI control "+label);
-            field(ai(),"服务名称").setText("文本供应商");field(ai(),"API 地址").setText("https://text.fixture.invalid/v1");field(ai(),"API Key").setText("text-secret");
+            for(String label:new String[]{"供应商","服务名称","API 地址","文本模型","图片模型","API Key"})check(find(ai(),label)!=null,"missing AI control "+label);
+            check(find(ai(),"上传已保存的 AI 配置")==null&&find(ai(),"下载 AI 配置")==null,"Independent AI backup panel remains");field(ai(),"服务名称").setText("文本供应商");field(ai(),"API 地址").setText("https://text.fixture.invalid/v1");field(ai(),"API Key").setText("text-secret");
             find(ai(),"保存供应商").performClick();check(find(ai(),"供应商已保存")!=null,"provider saved locally");check(field(ai(),"API Key").getText().length()==0,"key cleared after save");
             spinner(ai(),"供应商").setSelection(0);
         });
@@ -49,7 +49,7 @@ public final class ParcelUiInstrumentation extends Instrumentation {
             ((CheckBox)find(ai(),"启用取件 AI 分析")).setChecked(true);find(ai(),"保存功能模型").performClick();check(new AiSettings(getTargetContext()).enabled(),"explicit opt-in saved");
             field(ai(),"文本模型").setText("");((CheckBox)find(ai(),"启用取件 AI 分析")).setChecked(false);check(!new AiSettings(getTargetContext()).enabled(),"disable works immediately despite incomplete form");
             activity.onBackPressed();
-            check(!activity.getFragmentManager().findFragmentByTag("parcel").isHidden(),"back returns to originating parcel page");
+            check(!activity.getFragmentManager().findFragmentByTag("parcel").isHidden(),"back returns to originating parcel page");activity.show("webdav");View backup=activity.getFragmentManager().findFragmentByTag("webdav").getView();check(find(backup,"备份当前配置")!=null&&find(backup,"查看配置备份")!=null,"Unified configuration backup controls missing");
         });
         result.putString("stream","PASS: "+assertions+" parcel/AI UI assertions; explicit opt-in, date range, built-in config, independent providers, safe secret handling and back navigation\n");
         finish(Activity.RESULT_OK,result);

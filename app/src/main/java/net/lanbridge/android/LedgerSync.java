@@ -12,24 +12,23 @@ public final class LedgerSync {
     private static LedgerSync singleton;
     public static synchronized LedgerSync get(Context context){if(singleton==null)singleton=new LedgerSync(context.getApplicationContext());return singleton;}
     private final Context context;
-    private final ScheduledExecutorService worker=Executors.newSingleThreadScheduledExecutor();
     private volatile LedgerStore store;
     private final Map<String,String> verifiedOps=new HashMap<>();private String verifiedIdentity="";
     public volatile String status="尚未同步";
     public volatile boolean busy;
     public volatile long revision;
-    private LedgerSync(Context context){this.context=context;worker.scheduleWithFixedDelay(this::perform,0,60,TimeUnit.SECONDS);}
+    private LedgerSync(Context context){this.context=context;}
     public synchronized LedgerStore store()throws Exception{if(store==null)store=new LedgerStore(new File(context.getFilesDir(),"ledger-v1"));return store;}
     public String remotePath(){return WebDavSettings.root(context);}
-    public void sync(){worker.execute(this::perform);}
-    public void changed(){revision++;sync();}
-    public void submit(Runnable action){worker.execute(action);}
+    public void sync(){DataSyncManager.get(context).request("ledger",DataSyncManager.Trigger.MANUAL);}
+    public void changed(){revision++;DataSyncManager.get(context).request("ledger",DataSyncManager.Trigger.LOCAL_CHANGE);}
+    public void submit(Runnable action){DataSyncManager.get(context).execute(action);}
     private static void verified(File file,JSONObject attachment)throws Exception{if(file.length()!=attachment.getLong("size")||!LedgerStore.hash(file).equals(attachment.getString("sha256")))throw new IOException("附件完整性校验失败");}
-    private void perform(){
-        if(busy)return;busy=true;
+    String performOnce()throws Exception{
+        busy=true;
         try{
             WebDavSettings.migrate(context);LoginStore credentials=WebDavSettings.store(context);
-            if(!credentials.hasPassword()){status="离线保存 · 请配置统一 WebDAV 连接";return;}
+            if(!credentials.hasPassword())throw new IOException("请配置统一 WebDAV 连接");
             WebDavSettings.Connection target=WebDavSettings.connection(context);String identity=target.url+"\n"+target.user+"\n"+target.root+"\n"+credentials.revision();if(!identity.equals(verifiedIdentity)){verifiedOps.clear();verifiedIdentity=identity;}
             LedgerStore local=store();status="正在合并同步…";target.ensure();String ledgerMigrationError="";try{WebDavSettings.importLegacyLedgers(context,local,target);}catch(Exception legacy){ledgerMigrationError=legacy.getMessage();}
             try(RelayDav dav=new RelayDav(target.url,target.root,target.user,target.password)){
@@ -62,9 +61,10 @@ public final class LedgerSync {
                 }
                 if(local.pendingParents()>0)throw new IOException(local.pendingParents()+" 条操作等待缺失的父版本，未丢弃本地数据");
                 int conflicts=0;for(String type:new String[]{"entry","project","network_profile"}){JSONArray items=local.list(type);for(int i=0;i<items.length();i++)conflicts+=items.getJSONObject(i).getJSONObject("_conflicts").length();}
-                try{WebDavSettings.migrateFiles(context,target);}catch(Exception migration){WebDavSettings.migrationStatus="旧中转迁移未完成，原文件保留："+migration.getMessage();}if(!ledgerMigrationError.isEmpty())WebDavSettings.migrationStatus="旧记账迁移未完成，原记录保留："+ledgerMigrationError;
+                String relayMigrationError="";try{WebDavSettings.migrateFiles(context,target);}catch(Exception migration){relayMigrationError="旧中转迁移未完成，原文件保留："+migration.getMessage();WebDavSettings.migrationStatus=relayMigrationError;}if(!ledgerMigrationError.isEmpty())throw new IOException("旧记账迁移未完成，原记录保留："+ledgerMigrationError);if(!relayMigrationError.isEmpty())throw new IOException(relayMigrationError);
                 status="已同步 "+java.time.LocalTime.now().withNano(0)+" · 上传 "+uploaded+" / 下载 "+downloaded+(conflicts>0?" · "+conflicts+" 个字段待处理":"");
             }
-        }catch(Exception e){status="离线数据已保留 · 同步失败："+e.getMessage();}finally{busy=false;revision++;}
+        }catch(Exception e){status="离线数据已保留 · 同步失败："+e.getMessage();throw e;}finally{busy=false;revision++;}
+        return status;
     }
 }

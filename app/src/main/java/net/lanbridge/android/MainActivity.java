@@ -12,6 +12,8 @@ public final class MainActivity extends Activity {
     private static final int CONTENT_ID = 0x00ad001;
     private ToolUi.Shell shell;
     private LinearLayout bottom;
+    private ImageButton syncButton;private final android.os.Handler syncHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable syncRefresh=new Runnable(){public void run(){DataSyncManager manager=DataSyncManager.get(MainActivity.this);syncButton.setImageDrawable(new ToolUi.Icon("refresh",manager.running?ToolUi.BLUE:manager.error.isEmpty()?ToolUi.MUTED:0xffb33c3c));syncButton.setTooltipText(manager.summary());syncHandler.postDelayed(this,700);}};
     private String page = "home", connectionReturn = "settings", aiReturn = "settings";
 
     static String pageFor(ComponentName component) {
@@ -29,7 +31,10 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        try{ConfigBackupService.recoverPending(this);}catch(Exception e){Toast.makeText(this,"本机配置恢复未完成，请重试",Toast.LENGTH_LONG).show();}
         LinearLayout body = ToolUi.column(this);
+        LinearLayout globalBar=new LinearLayout(this);globalBar.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);globalBar.setPadding(ToolUi.dp(this,12),0,ToolUi.dp(this,12),0);
+        syncButton=ToolUi.iconButton(this,"refresh","同步数据",()->{DataSyncManager.get(this).requestAll(DataSyncManager.Trigger.MANUAL);Toast.makeText(this,"已请求同步数据",Toast.LENGTH_SHORT).show();});syncButton.setTag("global-data-sync");syncButton.setOnLongClickListener(v->{new AlertDialog.Builder(this).setTitle("数据同步").setMessage(DataSyncManager.get(this).summary()).setPositiveButton("关闭",null).show();return true;});globalBar.addView(syncButton);body.addView(globalBar,new LinearLayout.LayoutParams(-1,ToolUi.dp(this,48)));
         FrameLayout pane = new FrameLayout(this);
         pane.setId(CONTENT_ID);
         body.addView(pane,new LinearLayout.LayoutParams(-1,0,1));
@@ -101,7 +106,8 @@ public final class MainActivity extends Activity {
         intent.setAction(null);
     }
     @Override protected void onNewIntent(Intent intent) { super.onNewIntent(intent);setIntent(intent);handleIntent(intent); }
-    @Override protected void onResume() { super.onResume();AppUpdater.get(this).resumeInstall(this);LedgerSync.get(this).sync(); }
+    @Override protected void onResume() { super.onResume();AppUpdater.get(this).resumeInstall(this);DataSyncManager.get(this).requestAll(DataSyncManager.Trigger.STARTUP);syncHandler.post(syncRefresh); }
+    @Override protected void onPause(){syncHandler.removeCallbacks(syncRefresh);super.onPause();}
     @Override protected void onSaveInstanceState(Bundle state) { super.onSaveInstanceState(state);state.putString("page",page);state.putString("connectionReturn",connectionReturn);state.putString("aiReturn",aiReturn); }
     void closePage() { show(page.equals("webdav")?connectionReturn:page.equals("ai-settings")?aiReturn:"home"); }
     @Override public void onBackPressed() {

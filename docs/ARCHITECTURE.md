@@ -10,7 +10,9 @@
 - `NasSession`、`WsChannel`、`SocksBridge`：认证、WebSocket 隧道和本地 SOCKS5。
 - `LoginStore`：Android Keystore 绑定本机的密码加密存储。
 - `ToolUi`：共享原生控件、线条图标和按 600dp 当前窗口宽度切换的左右导航容器。
-- `WebDavSettings` / `WebDavFragment`：唯一 WebDAV 连接与统一根目录。`ledger-v1`、`file-relay`、`config-backups/android` 均自动派生；旧服务路径仅作为内部迁移来源，不再可编辑。迁移保留源文件并使用禁止覆盖写入，冲突文件归入稳定的 legacy 子目录。迁移任务凭据仍使用设备 Keystore 保存。已排队传输固定连接快照，后续改设置不会改变去向。
+- `WebDavSettings` / `WebDavFragment`：唯一 WebDAV 连接与统一根目录。`ledger-v1`、`file-relay`、`config-backups/shared` 均自动派生；旧服务路径仅作为内部迁移来源，不再可编辑。迁移保留源文件并使用禁止覆盖写入，冲突文件归入稳定的 legacy 子目录。迁移任务凭据仍使用设备 Keystore 保存。已排队传输固定连接快照，后续改设置不会改变去向。
+- `DataSyncManager`：注册业务同步服务，统一接收启动、修改、周期和手动触发；单队列合并重复请求，执行中本地修改最多增加一次后续同步，持久保存成功时间及错误。连接改变清空旧状态，并拒绝把旧连接的在途结果记为新连接成功。全局成功时间取所有已配置服务的最早成功时间；自动失败按5至300秒退避重试，连续本地修改合并1秒，手动点击可立即重试。目前只注册记账/诊断服务，不读取或同步短信/取件数据库。
+- `ConfigBackupService` / `ConfigBackupCodec`：手动 v2 加密配置备份；跨端只共享 AI，同端恢复平台偏好。预览状态校验避免并发覆盖，加密事务记录支持失败回滚与重启恢复。旧 Android/AI 文件兼容读取。
 - `RelayFragment` / `RelayService`：中转文件与本机缓存列表、系统文件 URI 授权、前台传输队列。销毁后的异步列表回调不得再更新界面。
 - `ToolEntryActivity`：保留已有 Relay/VPN/WebDAV Activity 名称作为兼容入口；转入 MainActivity 时复制 Intent、ClipData 和 URI 授权。应用内直接切换 Fragment，外部分享入口不变。
 - `AppUpdater`：应用级后台下载任务；独立 HTTP 客户端，不携带 NAS Cookie。

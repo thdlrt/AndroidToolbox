@@ -6,7 +6,7 @@ import java.io.IOException;
 
 /** Whole profile snapshots are encrypted using this device's Keystore. */
 final class AiSettings {
-    private static final Object LOCK=new Object();
+    private static final Object LOCK=ConfigBackupService.CONFIG_LOCK;
     private final Context context;
     private final LoginStore store;
     AiSettings(Context c){context=c.getApplicationContext();store=new LoginStore(context,"ai-config","toolbox-ai-config-v1");}

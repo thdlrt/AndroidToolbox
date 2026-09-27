@@ -14,7 +14,7 @@ final class WebDavSettings {
     private static final Object REMOTE_LOCK=new Object();
     static LoginStore store(Context c){return new LoginStore(c,"webdav-profile","webdav-login-v1");}
     private static SharedPreferences settings(Context c){return c.getSharedPreferences("webdav-layout",0);}
-    static synchronized void migrate(Context c)throws Exception{
+    static synchronized void migrate(Context c)throws Exception{synchronized(ConfigBackupService.CONFIG_LOCK){
         SharedPreferences relay=c.getSharedPreferences("relay",0);
         if(!relay.getBoolean("shared_migrated",false)){
             LoginStore old=new LoginStore(c,"relay-profile","relay-login-v1"),shared=store(c);
@@ -31,13 +31,15 @@ final class WebDavSettings {
             if(!global.edit().putString("root",selected).putBoolean("unified_v2",true).commit())throw new IOException("无法保存统一根目录");
         }
     }
+    }
     static String root(Context c){return settings(c).getString("root","WinToolbox");}
     static String path(Context c){return root(c)+"/file-relay";}
     static String identity(Context c){LoginStore s=store(c);return s.origin()+"\n"+s.username()+"\n"+root(c)+"\n"+s.revision();}
-    static synchronized void save(Context c,String url,String username,String password,String root)throws Exception{
+    static synchronized void save(Context c,String url,String username,String password,String root)throws Exception{synchronized(ConfigBackupService.CONFIG_LOCK){
         migrate(c);RelayDav.path(root,false);LoginStore previous=store(c);
         if(previous.hasPassword()&&(!previous.origin().equals(url)||!previous.username().equals(username)||!root(c).equals(root)))queueSource(c,previous,path(c),root(c));
-        previous.save(url,username,password,"");if(!settings(c).edit().putString("root",root).commit())throw new IOException("无法保存统一根目录");
+        previous.save(url,username,password,"");if(!settings(c).edit().putString("root",root).commit())throw new IOException("无法保存统一根目录");DataSyncManager.connectionChanged(c);
+    }
     }
     private static String sourcePassword(LoginStore source,Connection target)throws Exception{return sameEndpoint(source.origin(),target.url)&&source.username().equals(target.user)?target.password:source.password(source.origin(),source.username());}
     private static boolean sameEndpoint(String a,String b)throws Exception{return RelayDav.endpoint(a).equals(RelayDav.endpoint(b));}
@@ -51,9 +53,9 @@ final class WebDavSettings {
         final String url,user,password,root;
         Connection(String url,String user,String password,String root){this.url=url;this.user=user;this.password=password;this.root=root;}
         RelayDav client()throws Exception{return new RelayDav(url,root,user,password);}
-        void ensure()throws Exception{try(RelayDav dav=client()){dav.ensure("");dav.ensure("file-relay");dav.ensure("ledger-v1");dav.ensure("config-backups");dav.ensure("config-backups/android");}}
+        void ensure()throws Exception{try(RelayDav dav=client()){dav.ensure("");dav.ensure("file-relay");dav.ensure("ledger-v1");dav.ensure("config-backups");dav.ensure("config-backups/android");dav.ensure("config-backups/shared");}}
     }
-    static Connection connection(Context c)throws Exception{migrate(c);LoginStore s=store(c);String pass=s.password(s.origin(),s.username());if(pass.isEmpty())throw new IOException("请配置统一 WebDAV 连接");return new Connection(s.origin(),s.username(),pass,root(c));}
+    static synchronized Connection connection(Context c)throws Exception{synchronized(ConfigBackupService.CONFIG_LOCK){migrate(c);LoginStore s=store(c);String pass=s.password(s.origin(),s.username());if(pass.isEmpty())throw new IOException("请配置统一 WebDAV 连接");return new Connection(s.origin(),s.username(),pass,root(c));}}
     static RelayDav rootClient(Context c)throws Exception{return connection(c).client();}
     static void ensureServices(Context c)throws Exception{connection(c).ensure();}
     static void migrateFiles(Context c)throws Exception{migrateFiles(c,connection(c));}
