@@ -19,7 +19,7 @@ public final class ParcelStore extends SQLiteOpenHelper {
         }
     }
     public ParcelStore(Context context){this(context,"parcels.db");}
-    ParcelStore(Context context,String name){super(context.getApplicationContext(),name,null,2);}
+    ParcelStore(Context context,String name){super(context.getApplicationContext(),name,null,3);}
     @Override public void onConfigure(SQLiteDatabase db){db.setForeignKeyConstraintsEnabled(true);}
     @Override public void onCreate(SQLiteDatabase db){
         db.execSQL("CREATE TABLE parcels(id TEXT PRIMARY KEY,code TEXT NOT NULL,tracking_number TEXT NOT NULL,carrier TEXT NOT NULL,location TEXT NOT NULL,locker TEXT NOT NULL,status TEXT NOT NULL,deadline TEXT,tracking_key TEXT NOT NULL,code_key TEXT NOT NULL,location_key TEXT NOT NULL,locker_key TEXT NOT NULL,carrier_key TEXT NOT NULL,collected INTEGER NOT NULL,manual_collected INTEGER NOT NULL,received_at INTEGER NOT NULL,last_event_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,needs_review INTEGER NOT NULL DEFAULT 0)");
@@ -27,8 +27,16 @@ public final class ParcelStore extends SQLiteOpenHelper {
         db.execSQL("CREATE TABLE processed(fingerprint TEXT PRIMARY KEY,sms_id TEXT NOT NULL,date INTEGER NOT NULL)");
         db.execSQL("CREATE TABLE sources(fingerprint TEXT PRIMARY KEY,sms_id TEXT NOT NULL,date INTEGER NOT NULL,sender TEXT NOT NULL,body TEXT NOT NULL,image_sha256 TEXT)");
         db.execSQL("CREATE TABLE parcel_sources(parcel_id TEXT NOT NULL REFERENCES parcels(id) ON DELETE CASCADE,fingerprint TEXT NOT NULL REFERENCES sources(fingerprint),PRIMARY KEY(parcel_id,fingerprint))");
+        createLocations(db);
     }
-    @Override public void onUpgrade(SQLiteDatabase db,int oldVersion,int newVersion){if(oldVersion==1&&newVersion==2)db.execSQL("ALTER TABLE parcels ADD COLUMN needs_review INTEGER NOT NULL DEFAULT 0");else throw new IllegalStateException("不支持的取件数据版本");}
+    private static void createLocations(SQLiteDatabase db){db.execSQL("CREATE TABLE location_aliases(alias_key TEXT PRIMARY KEY,location TEXT NOT NULL)");}
+    @Override public void onUpgrade(SQLiteDatabase db,int oldVersion,int newVersion){
+        if(oldVersion<1||newVersion!=3)throw new IllegalStateException("不支持的取件数据版本");
+        if(oldVersion<2)db.execSQL("ALTER TABLE parcels ADD COLUMN needs_review INTEGER NOT NULL DEFAULT 0");
+        if(oldVersion<3){createLocations(db);try(Cursor c=db.rawQuery("SELECT id,location,locker FROM parcels",null)){while(c.moveToNext()){ParcelLocation place=ParcelLocation.of(c.getString(1),c.getString(2));ContentValues values=new ContentValues();putLocation(values,place.location,place.locker);db.update("parcels",values,"id=?",new String[]{c.getString(0)});}}}
+    }
+    private static void putLocation(ContentValues values,String location,String locker){values.put("location",location);values.put("location_key",ParcelAi.normalize(location));values.put("locker",locker);values.put("locker_key",ParcelAi.normalize(locker));}
+    private static ParcelAi.Item canonical(SQLiteDatabase db,ParcelAi.Item item){ParcelLocation place=ParcelLocation.of(item.location,item.locker);String location=place.location;try(Cursor c=db.rawQuery("SELECT location FROM location_aliases WHERE alias_key=?",new String[]{ParcelAi.normalize(location)})){if(c.moveToFirst())location=c.getString(0);}return item.at(location,place.locker);}
     private static String text(Cursor c,String key){return c.getString(c.getColumnIndexOrThrow(key));}
     private static long number(Cursor c,String key){return c.getLong(c.getColumnIndexOrThrow(key));}
     private static boolean processed(SQLiteDatabase db,String fingerprint){try(Cursor c=db.rawQuery("SELECT 1 FROM processed WHERE fingerprint=?",new String[]{fingerprint})){return c.moveToFirst();}}
@@ -40,7 +48,8 @@ public final class ParcelStore extends SQLiteOpenHelper {
         try{
             for(ParcelSms.Message message:messages)if(processed(db,message.fingerprint))already.add(message.fingerprint);
             List<ParcelAi.Item> ordered=new ArrayList<>(items);ordered.sort(Comparator.comparingLong(item->eventDate(item,sources)));
-            for(ParcelAi.Item item:ordered){
+            for(ParcelAi.Item extracted:ordered){
+                ParcelAi.Item item=canonical(db,extracted);
                 if(!item.status.equals(ParcelAi.PENDING)&&!item.status.equals(ParcelAi.COLLECTED))continue;
                 boolean fresh=false;for(String id:item.sourceIds)fresh|=!already.contains(sources.get(id).fingerprint);if(!fresh)continue;
                 long date=eventDate(item,sources);Match identity=find(db,item,date);String match=identity.id;String id=match==null?UUID.randomUUID().toString().replace("-",""):match;ContentValues record=new ContentValues();long now=System.currentTimeMillis();
@@ -78,6 +87,25 @@ public final class ParcelStore extends SQLiteOpenHelper {
     public synchronized List<Parcel> list(boolean archived,String sort){
         String order=sort.equals("address")?"location_key,locker_key,received_at DESC":sort.equals("locker")?"locker_key,location_key,received_at DESC":sort.equals("carrier")?"carrier_key,location_key,received_at DESC":"received_at DESC";
         SQLiteDatabase db=getReadableDatabase();List<Parcel> rows=new ArrayList<>();try(Cursor c=db.rawQuery("SELECT * FROM parcels WHERE collected=? ORDER BY "+order+",id",new String[]{archived?"1":"0"})){while(c.moveToNext())rows.add(new Parcel(c,sources(db,text(c,"id"))));}return rows;
+    }
+    /** Counts include archived records, so old names do not return after restoring a parcel. */
+    public synchronized Map<String,Integer> locations(){Map<String,Integer> result=new LinkedHashMap<>();try(Cursor c=getReadableDatabase().rawQuery("SELECT location,COUNT(*) FROM parcels WHERE location<>'' GROUP BY location ORDER BY location",null)){while(c.moveToNext())result.put(c.getString(0),c.getInt(1));}return result;}
+    /** Explicit user selection only: group names change, package identities and sources do not. */
+    public synchronized int unifyLocations(List<String> selected,String target)throws IOException{
+        String name=ParcelLocation.format(target);ParcelLocation place=ParcelLocation.of(name,"");
+        if(name.isEmpty()||name.length()>512||name.contains("\0")||name.contains("\n")||!place.locker.isEmpty())throw new IOException("请填写站点名称，室内 / 室外和柜号应留在柜位中");
+        name=place.location;if(selected.isEmpty())throw new IOException("请选择需要统一的地点");
+        Set<String> keys=new HashSet<>();for(String source:selected){String key=ParcelAi.normalize(source);if(key.isEmpty())throw new IOException("地点名称无效");keys.add(key);}
+        SQLiteDatabase db=getWritableDatabase();db.beginTransaction();int count=0;
+        try{
+            // Retarget earlier aliases as well: renaming A -> B -> C stays stable for future A imports.
+            List<String> aliases=new ArrayList<>();try(Cursor c=db.rawQuery("SELECT alias_key,location FROM location_aliases",null)){while(c.moveToNext())if(keys.contains(ParcelAi.normalize(c.getString(1))))aliases.add(c.getString(0));}
+            ContentValues rename=new ContentValues();rename.put("location",name);rename.put("location_key",ParcelAi.normalize(name));rename.put("updated_at",System.currentTimeMillis());
+            count=db.update("parcels",rename,"location_key IN ("+String.join(",",Collections.nCopies(keys.size(),"?"))+")",keys.toArray(new String[0]));
+            if(count==0)throw new IOException("地点已变化，请重新打开整理地点");
+            aliases.addAll(keys);aliases.add(ParcelAi.normalize(name));for(String key:aliases){ContentValues alias=new ContentValues();alias.put("alias_key",key);alias.put("location",name);db.insertWithOnConflict("location_aliases",null,alias,SQLiteDatabase.CONFLICT_REPLACE);}
+            db.setTransactionSuccessful();return count;
+        }catch(IOException e){throw e;}catch(Exception e){throw new IOException("地点整理失败，未修改记录或规则");}finally{db.endTransaction();}
     }
     private static List<ParcelSms.Message> sources(SQLiteDatabase db,String parcel){List<ParcelSms.Message> result=new ArrayList<>();try(Cursor c=db.rawQuery("SELECT s.* FROM sources s JOIN parcel_sources p ON p.fingerprint=s.fingerprint WHERE p.parcel_id=? ORDER BY s.date,s.sms_id",new String[]{parcel})){while(c.moveToNext())result.add(new ParcelSms.Message(text(c,"sms_id"),number(c,"date"),text(c,"sender"),text(c,"body"),c.isNull(c.getColumnIndexOrThrow("image_sha256"))?null:text(c,"image_sha256")));}return result;}
     public synchronized void setCollected(String id,boolean collected)throws IOException{ContentValues values=new ContentValues();values.put("collected",collected?1:0);values.put("manual_collected",collected?1:0);values.put("needs_review",0);values.put("status",collected?ParcelAi.COLLECTED:ParcelAi.PENDING);values.put("updated_at",System.currentTimeMillis());if(getWritableDatabase().update("parcels",values,"id=?",new String[]{id})!=1)throw new IOException("取件记录不存在");}
