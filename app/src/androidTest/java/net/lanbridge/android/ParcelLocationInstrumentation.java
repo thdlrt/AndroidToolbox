@@ -26,7 +26,7 @@ final class ParcelLocationInstrumentation {
             store.setCollected(original,true);
             // Recreate an actual version-2 layout with the legacy split location/locker fields.
             ContentValues old=new ContentValues();old.put("location","南大仙林菜根谭室内");old.put("location_key",ParcelAi.normalize("南大仙林菜根谭室内"));old.put("locker","9号丰巢柜");old.put("locker_key",ParcelAi.normalize("9号丰巢柜"));store.getWritableDatabase().update("parcels",old,"id=?",new String[]{original});
-            store.getWritableDatabase().execSQL("DROP TABLE location_aliases");store.getWritableDatabase().setVersion(2);store.close();store=new ParcelStore(context,name);
+            store.getWritableDatabase().execSQL("DROP TABLE parcel_identity_aliases");store.getWritableDatabase().execSQL("ALTER TABLE parcels DROP COLUMN manual_fields");store.getWritableDatabase().execSQL("DROP TABLE location_aliases");store.getWritableDatabase().setVersion(2);store.close();store=new ParcelStore(context,name);
             check(store.locations().size()==1,"Version-2 migration did not unify locations");ParcelStore.Parcel migrated=store.list(true,"address").get(0);
             check(migrated.id.equals(original)&&migrated.manualCollected&&migrated.collected&&migrated.sources.size()==2&&migrated.locker.equals("室内9号丰巢柜"),"Migration lost source, state or cabinet");
             ingest(store,"alias","9021","南大菜根谭","室外2号丰巢柜");

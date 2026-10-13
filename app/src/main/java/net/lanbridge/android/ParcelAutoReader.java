@@ -28,7 +28,7 @@ final class ParcelAutoReader {
         try{
             if(context.checkSelfPermission(Manifest.permission.READ_SMS)!=PackageManager.PERMISSION_GRANTED)throw new IllegalStateException("自动读取需要短信权限，请在取件设置中授予权限");
             ParcelAi.Config config=new AiSettings(context).parcelConfig(true);int days=days(context);long now=System.currentTimeMillis();
-            List<ParcelSms.Message> messages=ParcelSms.query(context,ParcelAutoPolicy.start(now,days,java.time.ZoneId.systemDefault()),now);
+            List<ParcelSms.Message> messages=ParcelSms.queryForImport(context,ParcelAutoPolicy.start(now,days,java.time.ZoneId.systemDefault()),now);
             int count=importItems(context,messages,Collections.emptyList(),config,true);
             status=count==0?"自动读取完成，没有新的取件信息":"自动读取完成，已更新 "+count+" 条取件信息";
             prefs(context).edit().putLong("last_success",now).apply();
@@ -36,11 +36,15 @@ final class ParcelAutoReader {
         finally{prefs(context).edit().putString("status",status).apply();running=false;gate.end();revision++;}
     });}
     static int importItems(Context context,List<ParcelSms.Message> sources,List<ParcelAi.Image> images,ParcelAi.Config config,boolean automatic)throws Exception{
+        return importItems(context,sources,images,config,automatic,false);
+    }
+    static int importItems(Context context,List<ParcelSms.Message> sources,List<ParcelAi.Image> images,ParcelAi.Config config,boolean automatic,boolean retryUnmatched)throws Exception{
         synchronized(IMPORT_LOCK){
+            retryUnmatched=retryUnmatched&&!automatic;
             if(automatic&&!enabled(context))throw new IllegalStateException("自动读取已关闭");
             try(ParcelStore store=new ParcelStore(context.getApplicationContext())){
-                List<ParcelSms.Message> pending=store.pendingSources(sources);if(pending.isEmpty())return 0;
-                List<ParcelAi.Item> items=ParcelAi.parse(config,pending,images);return store.ingest(pending,items);
+                List<ParcelSms.Message> pending=store.pendingSources(sources,retryUnmatched);if(pending.isEmpty())return 0;
+                List<ParcelAi.Item> items=ParcelAi.parse(config,pending,images);return store.ingest(pending,items,retryUnmatched);
             }
         }
     }

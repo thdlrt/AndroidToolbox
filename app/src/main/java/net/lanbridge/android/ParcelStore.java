@@ -9,44 +9,63 @@ import java.util.*;
 /** Private transactional parcel records. Business records never enter configuration backups. */
 public final class ParcelStore extends SQLiteOpenHelper {
     public static final long DEDUPE_WINDOW_MS=72L*3600000;
+    private static final String[] EDIT_FIELDS={"code","tracking_number","carrier","location","locker","deadline"};
+    private static final String IDENTITIES="(SELECT id AS parcel_id,tracking_key,code_key,location_key,locker_key,carrier_key FROM parcels UNION SELECT parcel_id,tracking_key,code_key,location_key,locker_key,carrier_key FROM parcel_identity_aliases) i JOIN parcels p ON p.id=i.parcel_id";
+    public static final class Edit {
+        private final String[] values;
+        public Edit(String code,String tracking,String carrier,String location,String locker,String deadline)throws IOException{
+            values=new String[]{code,tracking,carrier,location,locker,deadline};String[] labels={"取件码","运单号","快递公司","地点","柜位","截止提示"};int[] limits={128,128,128,512,256,128};
+            for(int i=0;i<values.length;i++){String raw=values[i]==null?"":values[i];if(raw.contains("\0")||raw.contains("\n")||raw.contains("\r"))throw new IOException(labels[i]+"格式无效或过长（最多 "+limits[i]+" 字符）");values[i]=raw.trim();if(values[i].length()>limits[i])throw new IOException(labels[i]+"格式无效或过长（最多 "+limits[i]+" 字符）");}
+            ParcelLocation place=ParcelLocation.of(values[3],values[4]);values[3]=place.location;values[4]=place.locker;
+            if(values[4].length()>256)throw new IOException("柜位内容过长（最多 256 字符）");
+        }
+    }
     public static final class Parcel {
         public final String id,code,trackingNumber,carrier,location,locker,status,deadline;
         public final long receivedAt,updatedAt;
-        public final boolean collected,manualCollected,needsReview;
+        public final boolean collected,manualCollected,needsReview,manuallyEdited;
         public final List<ParcelSms.Message> sources;
         Parcel(Cursor row,List<ParcelSms.Message> sources){
-            id=text(row,"id");code=text(row,"code");trackingNumber=text(row,"tracking_number");carrier=text(row,"carrier");location=text(row,"location");locker=text(row,"locker");status=text(row,"status");deadline=row.isNull(row.getColumnIndexOrThrow("deadline"))?null:text(row,"deadline");receivedAt=number(row,"received_at");updatedAt=number(row,"updated_at");collected=number(row,"collected")!=0;manualCollected=number(row,"manual_collected")!=0;needsReview=number(row,"needs_review")!=0;this.sources=Collections.unmodifiableList(sources);
+            id=text(row,"id");code=text(row,"code");trackingNumber=text(row,"tracking_number");carrier=text(row,"carrier");location=text(row,"location");locker=text(row,"locker");status=text(row,"status");deadline=row.isNull(row.getColumnIndexOrThrow("deadline"))?null:text(row,"deadline");receivedAt=number(row,"received_at");updatedAt=number(row,"updated_at");collected=number(row,"collected")!=0;manualCollected=number(row,"manual_collected")!=0;needsReview=number(row,"needs_review")!=0;manuallyEdited=number(row,"manual_fields")!=0;this.sources=Collections.unmodifiableList(sources);
         }
     }
     public ParcelStore(Context context){this(context,"parcels.db");}
-    ParcelStore(Context context,String name){super(context.getApplicationContext(),name,null,3);}
+    ParcelStore(Context context,String name){super(context.getApplicationContext(),name,null,4);}
     @Override public void onConfigure(SQLiteDatabase db){db.setForeignKeyConstraintsEnabled(true);}
     @Override public void onCreate(SQLiteDatabase db){
-        db.execSQL("CREATE TABLE parcels(id TEXT PRIMARY KEY,code TEXT NOT NULL,tracking_number TEXT NOT NULL,carrier TEXT NOT NULL,location TEXT NOT NULL,locker TEXT NOT NULL,status TEXT NOT NULL,deadline TEXT,tracking_key TEXT NOT NULL,code_key TEXT NOT NULL,location_key TEXT NOT NULL,locker_key TEXT NOT NULL,carrier_key TEXT NOT NULL,collected INTEGER NOT NULL,manual_collected INTEGER NOT NULL,received_at INTEGER NOT NULL,last_event_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,needs_review INTEGER NOT NULL DEFAULT 0)");
+        db.execSQL("CREATE TABLE parcels(id TEXT PRIMARY KEY,code TEXT NOT NULL,tracking_number TEXT NOT NULL,carrier TEXT NOT NULL,location TEXT NOT NULL,locker TEXT NOT NULL,status TEXT NOT NULL,deadline TEXT,tracking_key TEXT NOT NULL,code_key TEXT NOT NULL,location_key TEXT NOT NULL,locker_key TEXT NOT NULL,carrier_key TEXT NOT NULL,collected INTEGER NOT NULL,manual_collected INTEGER NOT NULL,received_at INTEGER NOT NULL,last_event_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,needs_review INTEGER NOT NULL DEFAULT 0,manual_fields INTEGER NOT NULL DEFAULT 0)");
         db.execSQL("CREATE INDEX parcel_tracking ON parcels(tracking_key)");db.execSQL("CREATE INDEX parcel_code ON parcels(code_key,location_key,locker_key,last_event_at)");
         db.execSQL("CREATE TABLE processed(fingerprint TEXT PRIMARY KEY,sms_id TEXT NOT NULL,date INTEGER NOT NULL)");
         db.execSQL("CREATE TABLE sources(fingerprint TEXT PRIMARY KEY,sms_id TEXT NOT NULL,date INTEGER NOT NULL,sender TEXT NOT NULL,body TEXT NOT NULL,image_sha256 TEXT)");
         db.execSQL("CREATE TABLE parcel_sources(parcel_id TEXT NOT NULL REFERENCES parcels(id) ON DELETE CASCADE,fingerprint TEXT NOT NULL REFERENCES sources(fingerprint),PRIMARY KEY(parcel_id,fingerprint))");
         createLocations(db);
+        createIdentities(db);
     }
+    private static void createIdentities(SQLiteDatabase db){db.execSQL("CREATE TABLE parcel_identity_aliases(parcel_id TEXT NOT NULL REFERENCES parcels(id) ON DELETE CASCADE,tracking_key TEXT NOT NULL,code_key TEXT NOT NULL,location_key TEXT NOT NULL,locker_key TEXT NOT NULL,carrier_key TEXT NOT NULL,PRIMARY KEY(parcel_id,tracking_key,code_key,location_key,locker_key,carrier_key))");db.execSQL("CREATE INDEX parcel_alias_tracking ON parcel_identity_aliases(tracking_key)");db.execSQL("CREATE INDEX parcel_alias_code ON parcel_identity_aliases(code_key,location_key,locker_key)");}
     private static void createLocations(SQLiteDatabase db){db.execSQL("CREATE TABLE location_aliases(alias_key TEXT PRIMARY KEY,location TEXT NOT NULL)");}
     @Override public void onUpgrade(SQLiteDatabase db,int oldVersion,int newVersion){
-        if(oldVersion<1||newVersion!=3)throw new IllegalStateException("不支持的取件数据版本");
+        if(oldVersion<1||newVersion!=4)throw new IllegalStateException("不支持的取件数据版本");
         if(oldVersion<2)db.execSQL("ALTER TABLE parcels ADD COLUMN needs_review INTEGER NOT NULL DEFAULT 0");
         if(oldVersion<3){createLocations(db);try(Cursor c=db.rawQuery("SELECT id,location,locker FROM parcels",null)){while(c.moveToNext()){ParcelLocation place=ParcelLocation.of(c.getString(1),c.getString(2));ContentValues values=new ContentValues();putLocation(values,place.location,place.locker);db.update("parcels",values,"id=?",new String[]{c.getString(0)});}}}
+        if(oldVersion<4){db.execSQL("ALTER TABLE parcels ADD COLUMN manual_fields INTEGER NOT NULL DEFAULT 0");createIdentities(db);}
     }
     private static void putLocation(ContentValues values,String location,String locker){values.put("location",location);values.put("location_key",ParcelAi.normalize(location));values.put("locker",locker);values.put("locker_key",ParcelAi.normalize(locker));}
     private static ParcelAi.Item canonical(SQLiteDatabase db,ParcelAi.Item item){ParcelLocation place=ParcelLocation.of(item.location,item.locker);String location=place.location;try(Cursor c=db.rawQuery("SELECT location FROM location_aliases WHERE alias_key=?",new String[]{ParcelAi.normalize(location)})){if(c.moveToFirst())location=c.getString(0);}return item.at(location,place.locker);}
     private static String text(Cursor c,String key){return c.getString(c.getColumnIndexOrThrow(key));}
     private static long number(Cursor c,String key){return c.getLong(c.getColumnIndexOrThrow(key));}
     private static boolean processed(SQLiteDatabase db,String fingerprint){try(Cursor c=db.rawQuery("SELECT 1 FROM processed WHERE fingerprint=?",new String[]{fingerprint})){return c.moveToFirst();}}
-    public synchronized List<ParcelSms.Message> pendingSources(List<ParcelSms.Message> input){SQLiteDatabase db=getReadableDatabase();List<ParcelSms.Message> result=new ArrayList<>();Set<String> seen=new HashSet<>();for(ParcelSms.Message message:input)if(seen.add(message.fingerprint)&&!processed(db,message.fingerprint))result.add(message);return result;}
+    private static boolean linked(SQLiteDatabase db,String fingerprint){try(Cursor c=db.rawQuery("SELECT 1 FROM parcel_sources WHERE fingerprint=? LIMIT 1",new String[]{fingerprint})){return c.moveToFirst();}}
+    public synchronized List<ParcelSms.Message> pendingSources(List<ParcelSms.Message> input){return pendingSources(input,false);}
+    public synchronized List<ParcelSms.Message> pendingSources(List<ParcelSms.Message> input,boolean retryUnmatched){SQLiteDatabase db=getReadableDatabase();List<ParcelSms.Message> result=new ArrayList<>();Set<String> seen=new HashSet<>();for(ParcelSms.Message message:input)if(seen.add(message.fingerprint)&&(!processed(db,message.fingerprint)||retryUnmatched&&message.imageSha256==null&&!linked(db,message.fingerprint)))result.add(message);return result;}
 
     /** Validate everything first; on any failure neither rows nor processed markers are committed. */
     public synchronized int ingest(List<ParcelSms.Message> messages,List<ParcelAi.Item> items)throws IOException{
+        return ingest(messages,items,false);
+    }
+    public synchronized int ingest(List<ParcelSms.Message> messages,List<ParcelAi.Item> items,boolean retryUnmatched)throws IOException{
         ParcelAi.validateItems(messages,items,false);Map<String,ParcelSms.Message> sources=new HashMap<>();for(ParcelSms.Message message:messages)sources.put(message.id,message);SQLiteDatabase db=getWritableDatabase();Set<String> already=new HashSet<>(),touched=new HashSet<>();db.beginTransaction();
         try{
-            for(ParcelSms.Message message:messages)if(processed(db,message.fingerprint))already.add(message.fingerprint);
+            for(ParcelSms.Message message:messages)if(processed(db,message.fingerprint)&&(!retryUnmatched||message.imageSha256!=null||linked(db,message.fingerprint)))already.add(message.fingerprint);
             List<ParcelAi.Item> ordered=new ArrayList<>(items);ordered.sort(Comparator.comparingLong(item->eventDate(item,sources)));
             for(ParcelAi.Item extracted:ordered){
                 ParcelAi.Item item=canonical(db,extracted);
@@ -55,8 +74,8 @@ public final class ParcelStore extends SQLiteOpenHelper {
                 long date=eventDate(item,sources);Match identity=find(db,item,date);String match=identity.id;String id=match==null?UUID.randomUUID().toString().replace("-",""):match;ContentValues record=new ContentValues();long now=System.currentTimeMillis();
                 if(match==null){record.put("needs_review",identity.review?1:0);record.put("id",id);record.put("code",item.code);record.put("tracking_number",item.trackingNumber);record.put("carrier",item.carrier);record.put("location",item.location);record.put("locker",item.locker);record.put("status",item.status);record.put("deadline",item.deadline);record.put("tracking_key",ParcelAi.normalize(item.trackingNumber));record.put("code_key",ParcelAi.normalize(item.code));record.put("location_key",ParcelAi.normalize(item.location));record.put("locker_key",ParcelAi.normalize(item.locker));record.put("carrier_key",ParcelAi.normalize(item.carrier));record.put("collected",item.status.equals(ParcelAi.COLLECTED)?1:0);record.put("manual_collected",0);record.put("received_at",date);record.put("last_event_at",date);record.put("updated_at",now);db.insertOrThrow("parcels",null,record);}
                 else try(Cursor old=db.rawQuery("SELECT * FROM parcels WHERE id=?",new String[]{id})){if(!old.moveToFirst())throw new IOException("取件记录不存在");boolean newer=date>=number(old,"last_event_at"),manual=number(old,"manual_collected")!=0;
-                    updateField(record,old,"code","code_key",item.code,newer);updateField(record,old,"tracking_number","tracking_key",item.trackingNumber,newer);updateField(record,old,"carrier","carrier_key",item.carrier,newer);updateField(record,old,"location","location_key",item.location,newer);updateField(record,old,"locker","locker_key",item.locker,newer);
-                    if(newer&&!manual&&number(old,"collected")==0){record.put("status",item.status);record.put("collected",item.status.equals(ParcelAi.COLLECTED)?1:0);}if(item.deadline!=null&&(newer||old.isNull(old.getColumnIndexOrThrow("deadline"))))record.put("deadline",item.deadline);record.put("received_at",Math.min(number(old,"received_at"),date));record.put("last_event_at",Math.max(number(old,"last_event_at"),date));record.put("updated_at",now);db.update("parcels",record,"id=?",new String[]{id});
+                    String[] incoming={item.code,item.trackingNumber,item.carrier,item.location,item.locker};String[] indexes={"code_key","tracking_key","carrier_key","location_key","locker_key"};int protectedFields=(int)number(old,"manual_fields");for(int i=0;i<incoming.length;i++)if((protectedFields&(1<<i))==0)updateField(record,old,EDIT_FIELDS[i],indexes[i],incoming[i],newer);
+                    if(newer&&!manual&&number(old,"collected")==0){record.put("status",item.status);record.put("collected",item.status.equals(ParcelAi.COLLECTED)?1:0);}if((protectedFields&32)==0&&item.deadline!=null&&(newer||old.isNull(old.getColumnIndexOrThrow("deadline"))))record.put("deadline",item.deadline);record.put("received_at",Math.min(number(old,"received_at"),date));record.put("last_event_at",Math.max(number(old,"last_event_at"),date));record.put("updated_at",now);db.update("parcels",record,"id=?",new String[]{id});
                 }
                 for(String sourceId:item.sourceIds){ParcelSms.Message source=sources.get(sourceId);ContentValues value=new ContentValues();value.put("fingerprint",source.fingerprint);value.put("sms_id",source.id);value.put("date",source.date);value.put("sender",source.sender);value.put("body",source.body);value.put("image_sha256",source.imageSha256);db.insertWithOnConflict("sources",null,value,SQLiteDatabase.CONFLICT_IGNORE);ContentValues link=new ContentValues();link.put("parcel_id",id);link.put("fingerprint",source.fingerprint);db.insertWithOnConflict("parcel_sources",null,link,SQLiteDatabase.CONFLICT_IGNORE);}
                 touched.add(id);
@@ -72,17 +91,28 @@ public final class ParcelStore extends SQLiteOpenHelper {
     private static Match find(SQLiteDatabase db,ParcelAi.Item item,long date){
         String track=ParcelAi.normalize(item.trackingNumber),code=ParcelAi.normalize(item.code),location=ParcelAi.normalize(item.location),locker=ParcelAi.normalize(item.locker),carrier=ParcelAi.normalize(item.carrier);
         if(!track.isEmpty()){
-            List<String> tracked=new ArrayList<>();try(Cursor c=db.rawQuery("SELECT id,carrier_key FROM parcels WHERE tracking_key=?",new String[]{track})){while(c.moveToNext())if(carrier.isEmpty()||c.getString(1).isEmpty()||carrier.equals(c.getString(1)))tracked.add(c.getString(0));}
-            if(tracked.size()==1)return new Match(tracked.get(0),false);if(tracked.size()>1)return new Match(null,true);
+            Set<String> tracked=new LinkedHashSet<>();try(Cursor c=db.rawQuery("SELECT p.id,i.carrier_key FROM "+IDENTITIES+" WHERE i.tracking_key=?",new String[]{track})){while(c.moveToNext())if(carrier.isEmpty()||c.getString(1).isEmpty()||carrier.equals(c.getString(1)))tracked.add(c.getString(0));}
+            if(tracked.size()==1)return new Match(tracked.iterator().next(),false);if(tracked.size()>1)return new Match(null,true);
         }
         if(code.isEmpty()||(location.isEmpty()&&locker.isEmpty()))return new Match(null,false);
         String[] args={code,location,locker,Long.toString(Math.max(0,date-DEDUPE_WINDOW_MS)),Long.toString(date+DEDUPE_WINDOW_MS)};
-        List<String> matches=new ArrayList<>();boolean archivedAmbiguity=false;try(Cursor c=db.rawQuery("SELECT id,carrier_key,tracking_key,collected FROM parcels WHERE code_key=? AND location_key=? AND locker_key=? AND last_event_at>=? AND last_event_at<=?",args)){
+        Set<String> matches=new LinkedHashSet<>();boolean archivedAmbiguity=false;try(Cursor c=db.rawQuery("SELECT p.id,i.carrier_key,i.tracking_key,p.collected FROM "+IDENTITIES+" WHERE i.code_key=? AND i.location_key=? AND i.locker_key=? AND p.last_event_at>=? AND p.last_event_at<=?",args)){
             while(c.moveToNext()){String previousTrack=c.getString(2);if(!track.isEmpty()&&!previousTrack.isEmpty()&&!track.equals(previousTrack))continue;if(!carrier.isEmpty()&&!c.getString(1).isEmpty()&&!carrier.equals(c.getString(1)))continue;
                 if(item.status.equals(ParcelAi.PENDING)&&c.getInt(3)!=0){archivedAmbiguity=true;continue;}matches.add(c.getString(0));}
         }
         if(archivedAmbiguity)return new Match(null,true);
-        return matches.size()==1?new Match(matches.get(0),false):new Match(null,matches.size()>1);
+        return matches.size()==1?new Match(matches.iterator().next(),false):new Match(null,matches.size()>1);
+    }
+    public synchronized void edit(Parcel expected,Edit edit)throws IOException{
+        SQLiteDatabase db=getWritableDatabase();db.beginTransaction();
+        try(Cursor old=db.rawQuery("SELECT * FROM parcels WHERE id=?",new String[]{expected.id})){
+            if(!old.moveToFirst())throw new IOException("取件记录不存在");
+            if(number(old,"updated_at")!=expected.updatedAt)throw new IOException("记录已更新，请关闭后重新打开编辑");
+            ContentValues values=new ContentValues();int changed=0;String[] indexes={"code_key","tracking_key","carrier_key","location_key","locker_key"};
+            for(int i=0;i<EDIT_FIELDS.length;i++){String before=old.isNull(old.getColumnIndexOrThrow(EDIT_FIELDS[i]))?"":text(old,EDIT_FIELDS[i]);String after=edit.values[i];if(!before.equals(after)){changed|=1<<i;if(i==5&&after.isEmpty())values.putNull(EDIT_FIELDS[i]);else values.put(EDIT_FIELDS[i],after);if(i<5)values.put(indexes[i],ParcelAi.normalize(after));}}
+            if(changed!=0){if((changed&31)!=0)db.execSQL("INSERT OR IGNORE INTO parcel_identity_aliases SELECT id,tracking_key,code_key,location_key,locker_key,carrier_key FROM parcels WHERE id=?",new Object[]{expected.id});values.put("manual_fields",number(old,"manual_fields")|changed);values.put("updated_at",Math.max(System.currentTimeMillis(),expected.updatedAt+1));db.update("parcels",values,"id=?",new String[]{expected.id});}
+            db.setTransactionSuccessful();
+        }catch(IOException e){throw e;}catch(Exception e){throw new IOException("快递信息保存失败，未修改记录");}finally{db.endTransaction();}
     }
     public synchronized List<Parcel> list(boolean archived,String sort){
         String order=sort.equals("address")?"location_key,locker_key,received_at DESC":sort.equals("locker")?"locker_key,location_key,received_at DESC":sort.equals("carrier")?"carrier_key,location_key,received_at DESC":"received_at DESC";

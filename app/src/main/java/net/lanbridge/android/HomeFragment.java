@@ -41,7 +41,7 @@ public final class HomeFragment extends ToolFragment {
         TextView title=text(id.equals("settings")?"设置":id.equals("tools")?"全部工具":"工具首页",26);title.setTypeface(null,Typeface.BOLD);content.addView(title);
         if(id.equals("settings")){settings();return;}
         TextView subtitle=text(id.equals("tools")?"勾选后显示在首页和侧边栏":"常用工具",14);subtitle.setTextColor(ToolUi.MUTED);content.addView(subtitle);
-        ToolUi.Grid grid=new ToolUi.Grid(context(),156,3,12);ToolUi.space(content,grid);
+        ToolUi.Grid grid=new ToolUi.Grid(context(),156,3,12,id.equals("home")?2:1);ToolUi.space(content,grid);
         for(ToolRegistry.Tool tool:ToolRegistry.TOOLS){
             boolean favorite=getPreferences(0).getBoolean("favorite."+tool.id,true);
             if(id.equals("home")&&!favorite)continue;

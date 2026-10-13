@@ -27,8 +27,26 @@ public final class ParcelInstrumentation {
             ParcelSms.Message lateReminder=sms("late-auto",now+10000,"中通，运单TRACK001，取件码1234，北门驿站A柜又提醒");store.ingest(List.of(lateReminder),List.of(item("late-auto","1234","TRACK001","中通","北门驿站","A柜",ParcelAi.PENDING)));boolean stayedArchived=false;for(ParcelStore.Parcel parcel:store.list(true,"newest"))if(parcel.id.equals(id))stayedArchived=true;check(stayedArchived,"Automatic completed state resurrected");
             ParcelSms.Message oldNoTrack=sms("old-archived",now,"取件码9090东门C柜");store.ingest(List.of(oldNoTrack),List.of(item("old-archived","9090","","","东门","C柜",ParcelAi.PENDING)));String archivedId=null;for(ParcelStore.Parcel parcel:store.list(false,"newest"))if(parcel.code.equals("9090"))archivedId=parcel.id;store.setCollected(archivedId,true);ParcelSms.Message reused=sms("new-reused",now+1000,"新包裹取件码9090东门C柜");store.ingest(List.of(reused),List.of(item("new-reused","9090","","","东门","C柜",ParcelAi.PENDING)));ParcelStore.Parcel candidate=null;for(ParcelStore.Parcel parcel:store.list(false,"newest"))if(parcel.code.equals("9090"))candidate=parcel;check(candidate!=null&&candidate.needsReview&&!candidate.id.equals(archivedId),"Reused code hidden in old archive");check(candidate.sources.get(0).id.equals("new-reused"),"Ambiguous source attached to wrong package");
             ParcelSms.Message multiA=sms("ma",now,"取件码3131北门"),multiB=sms("mb",now,"取件码4141北门");ParcelAi.Item badMerge=new ParcelAi.Item(List.of("ma","mb"),"3131","","","北门","",ParcelAi.PENDING,null);try{store.ingest(List.of(multiA,multiB),List.of(badMerge));throw new AssertionError("Cross-package merge accepted");}catch(IOException expected){}check(store.pendingSources(List.of(multiA,multiB)).size()==2,"Cross-package merge consumed source");store.ingest(List.of(multiA,multiB),List.of(item("ma","3131","","","北门","",ParcelAi.PENDING),item("mb","4141","","","北门","",ParcelAi.PENDING)));int split=0;for(ParcelStore.Parcel parcel:store.list(false,"newest"))if(parcel.code.equals("3131")||parcel.code.equals("4141"))split++;check(split==2,"Different complete codes merged");
+            ParcelSms.Message missed=sms("station-retry",now,"【驿小哥】您的菜鸟速递包裹已到某大学六栋菜根谭快递点，请23:30前凭68-4-2468来取，谢谢。");
+            store.ingest(List.of(missed),List.of(item(missed.id,"","","","","",ParcelAi.OTHER)));
+            check(store.pendingSources(List.of(missed)).isEmpty(),"Automatic scanning repeated processed source");
+            check(store.pendingSources(List.of(missed,missed),true).size()==1,"Retry did not select previously missed source once");
+            ParcelAi.Item corrected=new ParcelAi.Item(List.of(missed.id),"68-4-2468","","菜鸟速递","某大学六栋菜根谭快递点","",ParcelAi.PENDING,"23:30前");
+            check(store.ingest(List.of(missed),List.of(corrected))==0,"Normal ingest reprocessed missed source");
+            store.getWritableDatabase().execSQL("CREATE TRIGGER reject_retry BEFORE INSERT ON parcels WHEN NEW.code='68-4-2468' BEGIN SELECT RAISE(ABORT,'synthetic retry constraint'); END");
+            try{store.ingest(List.of(missed),List.of(corrected),true);throw new AssertionError("Retry failure expected");}catch(IOException expected){}
+            check(store.pendingSources(List.of(missed)).isEmpty(),"Failed retry removed processed marker");
+            check(store.pendingSources(List.of(missed),true).size()==1,"Failed retry consumed source");
+            store.getWritableDatabase().execSQL("DROP TRIGGER reject_retry");
+            check(store.ingest(List.of(missed),List.of(corrected),true)==1,"Missed arrival not recovered");
+            ParcelStore.Parcel recovered=null;for(ParcelStore.Parcel parcel:store.list(false,"newest"))if(parcel.code.equals("68-4-2468"))recovered=parcel;
+            check(recovered!=null&&recovered.deadline.equals("23:30前")&&recovered.carrier.equals("菜鸟速递")&&recovered.sources.get(0).body.equals(missed.body),"Arrival evidence not retained");
+            check(store.pendingSources(List.of(missed),true).isEmpty(),"Retry selected existing parcel");
+            store.setCollected(recovered.id,true);check(store.ingest(List.of(missed),List.of(corrected),true)==0,"Retry imported existing archive again");
+            check(store.pendingSources(List.of(missed),true).isEmpty(),"Retry selected archived source");
             int locationChecks=ParcelLocationInstrumentation.run(context);
-            return "PASS: "+checks+" parcel SQLite assertions + "+locationChecks+" location assertions; separate batches, migration, aliases, cabinet safety, archive and rollback";
+            int editChecks=ParcelEditInstrumentation.run(context);
+            return "PASS: "+checks+" parcel SQLite assertions + "+locationChecks+" location assertions + "+editChecks+" edit assertions; migration, identities, archive, manual protection, stale saves and rollback";
         }finally{store.close();context.deleteDatabase(name);}
     }
 }

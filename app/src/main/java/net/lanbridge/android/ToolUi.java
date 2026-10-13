@@ -20,9 +20,10 @@ final class ToolUi {
     static void space(LinearLayout parent,View child){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(parent.getContext(),12);parent.addView(child,p);}
     /** Reflows existing children without rebuilding forms or discarding their drafts. */
     static final class Grid extends ViewGroup {
-        private final int minimum,maximum,gap;private int columns=1;private final java.util.List<Integer> heights=new java.util.ArrayList<>();
-        Grid(Context c,int minimum,int maximum,int gap){super(c);this.minimum=minimum;this.maximum=maximum;this.gap=gap;}
-        @Override protected void onMeasure(int ws,int hs){int width=MeasureSpec.getSize(ws),g=dp(getContext(),gap);float scale=Math.max(1,getResources().getConfiguration().fontScale);columns=Math.max(1,Math.min(maximum,(int)((width+g)/(dp(getContext(),minimum)*scale+g))));if(maximum==4&&columns==3)columns=2;int cell=Math.max(0,(width-g*(columns-1))/columns);heights.clear();int count=0,total=0;
+        private final int minimum,maximum,gap,minimumColumns;private int columns=1;private final java.util.List<Integer> heights=new java.util.ArrayList<>();
+        Grid(Context c,int minimum,int maximum,int gap){this(c,minimum,maximum,gap,1);}
+        Grid(Context c,int minimum,int maximum,int gap,int minimumColumns){super(c);this.minimum=minimum;this.maximum=maximum;this.gap=gap;this.minimumColumns=minimumColumns;}
+        @Override protected void onMeasure(int ws,int hs){int width=MeasureSpec.getSize(ws),g=dp(getContext(),gap);float scale=Math.max(1,getResources().getConfiguration().fontScale);columns=Math.max(minimumColumns,Math.min(maximum,(int)((width+g)/(dp(getContext(),minimum)*scale+g))));if(maximum==4&&columns==3)columns=2;int cell=Math.max(0,(width-g*(columns-1))/columns);heights.clear();int count=0,total=0;
             for(int i=0;i<getChildCount();i++){View v=getChildAt(i);if(v.getVisibility()==GONE)continue;v.measure(MeasureSpec.makeMeasureSpec(cell,MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(0,MeasureSpec.UNSPECIFIED));int row=count/columns;if(row==heights.size())heights.add(0);heights.set(row,Math.max(heights.get(row),v.getMeasuredHeight()));count++;}
             for(int h:heights)total+=h;total+=Math.max(0,heights.size()-1)*g;setMeasuredDimension(width,resolveSize(total,hs));}
         @Override protected void onLayout(boolean changed,int l,int t,int r,int b){int g=dp(getContext(),gap),cell=(getWidth()-g*(columns-1))/columns,count=0,y=0;for(int i=0;i<getChildCount();i++){View v=getChildAt(i);if(v.getVisibility()==GONE)continue;int row=count/columns,col=count%columns;if(col==0&&count>0)y+=heights.get(row-1)+g;int x=col*(cell+g);v.layout(x,y,x+cell,y+heights.get(row));count++;}}

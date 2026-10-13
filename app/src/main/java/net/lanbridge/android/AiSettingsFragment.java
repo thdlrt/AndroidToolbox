@@ -10,7 +10,7 @@ import java.util.concurrent.Executors;
 
 public final class AiSettingsFragment extends ToolFragment {
     private EditText endpoint,name,key,vision;
-    private Spinner providerSelect,kindSelect,visionProvider;
+    private Spinner providerSelect,kindSelect,visionProvider,reasoning;
     private TextView status,keyHint;
     private Button save,saveProvider,removeProvider;private String loadedRevision="";
     private org.json.JSONArray providers=new org.json.JSONArray();
@@ -30,6 +30,8 @@ public final class AiSettingsFragment extends ToolFragment {
         body=ToolUi.card(context());sections.addView(body,0);title(body,"多模态模型");
         visionProvider=selector(body,"模型供应商");vision=ToolUi.field(context(),body,"模型 ID","",false);vision.setHint("支持文字和图片输入的模型 ID");
         body.addView(ToolUi.text(context(),"短信和图片使用同一个模型。添加内容时会发送给所选供应商分析。",13,ToolUi.MUTED));
+        reasoning=selector(body,"思考强度");reasoning.setAdapter(adapter(java.util.Arrays.asList(ParcelReasoning.LABELS)));
+        body.addView(ToolUi.text(context(),"模型默认沿用服务设置；低 / 中 / 高会明确开启思考。强度越高通常越慢，支持范围取决于模型。此项仅保存在本机。",13,ToolUi.MUTED));
         save=ToolUi.button(context(),"保存功能模型",true,this::save);body.addView(save);
         status=ToolUi.text(context(),"",14,ToolUi.MUTED);status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);root.addView(status);load(true,"");return scroll;
     }
@@ -43,14 +45,14 @@ public final class AiSettingsFragment extends ToolFragment {
         providerIds.clear();roleIds.clear();providerIds.add("");roleIds.add("");java.util.List<String> names=new java.util.ArrayList<>(),compatible=new java.util.ArrayList<>();names.add("新增供应商");compatible.add("请选择供应商");
         for(int i=0;i<providers.length();i++){JSONObject p=providers.getJSONObject(i);String id=p.getString("id"),label=p.optString("name",id);providerIds.add(id);names.add(label);if(!"gemini".equals(p.optString("kind"))){roleIds.add(id);compatible.add(label);}}
         providerSelect.setAdapter(adapter(names));select(providerSelect,providerIds,chosen);visionProvider.setAdapter(adapter(compatible));
-        if(roles){JSONObject r=value.getJSONObject("roles"),image=r.optJSONObject("parcel_vision");if(image==null)image=r.optJSONObject("vision");if(image==null)image=r.optJSONObject("parcel");if(image==null)image=r.optJSONObject("chat");visionId=image==null?"":image.optString("provider_id");vision.setText(image==null?"":image.optString("model"));}
+        if(roles){JSONObject r=value.getJSONObject("roles"),image=r.optJSONObject("parcel_vision");if(image==null)image=r.optJSONObject("vision");if(image==null)image=r.optJSONObject("parcel");if(image==null)image=r.optJSONObject("chat");visionId=image==null?"":image.optString("provider_id");vision.setText(image==null?"":image.optString("model"));reasoning.setSelection(java.util.Arrays.asList(ParcelReasoning.VALUES).indexOf(ParcelReasoning.load(context())));}
         select(visionProvider,roleIds,visionId);loading=false;loadProvider();loadedRevision=new AiSettings(context()).revision();
     }catch(Exception e){loading=false;showError(e);}}
     private void loadProvider(){String id=selected(providerSelect,providerIds);JSONObject p=new JSONObject();for(int i=0;i<providers.length();i++){JSONObject item=providers.optJSONObject(i);if(item!=null&&id.equals(item.optString("id")))p=item;}name.setText(p.optString("name"));endpoint.setText(p.optString("base_url"));key.setText("");kindSelect.setSelection("dashscope".equals(p.optString("kind"))?1:"gemini".equals(p.optString("kind"))?2:0);keyHint.setText(p.optBoolean("has_key")?"密钥已保存，留空保留。更改地址需重新填写密钥。":"密钥仅在本机加密保存。");removeProvider.setEnabled(!busy&&!id.isEmpty());}
     private void saveProvider(){if(busy)return;try{String id=new AiSettings(context()).saveProvider(selected(providerSelect,providerIds),name.getText().toString(),new String[]{"openai","dashscope","gemini"}[kindSelect.getSelectedItemPosition()],endpoint.getText().toString(),key.getText().toString());load(false,id);status.setTextColor(ToolUi.MUTED);status.setText("供应商已保存");}catch(Exception e){showError(e);}}
     private void removeProvider(){String id=selected(providerSelect,providerIds);if(busy||id.isEmpty())return;new com.google.android.material.dialog.MaterialAlertDialogBuilder(context()).setTitle("移除供应商？").setMessage("使用中的供应商需要先更改功能模型配置。").setNegativeButton("取消",null).setPositiveButton("移除",(d,w)->{try{new AiSettings(context()).removeProvider(id);load(false,"");status.setText("供应商已移除");}catch(Exception e){showError(e);}}).show();}
-    private void setBusy(boolean value,String message){busy=value;for(View v:new View[]{save,saveProvider,endpoint,name,key,vision,providerSelect,kindSelect,visionProvider})v.setEnabled(!value);removeProvider.setEnabled(!value&&!selected(providerSelect,providerIds).isEmpty());status.setTextColor(ToolUi.MUTED);status.setText(message);}
-    private void save(){if(busy)return;try{new AiSettings(context()).saveMultimodal(selected(visionProvider,roleIds),vision.getText().toString());load(true,selected(providerSelect,providerIds));status.setTextColor(ToolUi.MUTED);status.setText("功能模型已保存");}catch(Exception e){showError(e);}}
+    private void setBusy(boolean value,String message){busy=value;for(View v:new View[]{save,saveProvider,endpoint,name,key,vision,providerSelect,kindSelect,visionProvider,reasoning})v.setEnabled(!value);removeProvider.setEnabled(!value&&!selected(providerSelect,providerIds).isEmpty());status.setTextColor(ToolUi.MUTED);status.setText(message);}
+    private void save(){if(busy)return;try{String effort=ParcelReasoning.VALUES[reasoning.getSelectedItemPosition()];new AiSettings(context()).saveMultimodal(selected(visionProvider,roleIds),vision.getText().toString());ParcelReasoning.save(context(),effort);load(true,selected(providerSelect,providerIds));status.setTextColor(ToolUi.MUTED);status.setText("功能模型已保存");}catch(Exception e){showError(e);}}
     private void showError(Exception e){if(status!=null){status.setText(e.getMessage()==null?e.getClass().getSimpleName():e.getMessage());status.setTextColor(0xffa33d32);}}
     private void ui(Runnable action){runOnUiThread(()->{if(isAdded()&&getView()!=null)action.run();});}
     @Override protected void onPageResume(){if(!loadedRevision.equals(new AiSettings(context()).revision()))load(true,selected(providerSelect,providerIds));}

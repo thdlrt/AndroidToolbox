@@ -46,6 +46,10 @@ public final class ParcelSms {
     }
 
     /** Dates are inclusive, in Unix milliseconds. Must run on a worker thread. */
+    public static List<Message> queryForImport(Context context,long startMillis,long endMillis)throws IOException {
+        ParcelSmsFilter.Rules rules=ParcelSmsFilter.load(context);
+        return rules.select(query(context,startMillis,endMillis));
+    }
     public static List<Message> query(Context context, long startMillis, long endMillis) throws IOException {
         if (startMillis < 0 || endMillis < startMillis || endMillis - startMillis > MAX_RANGE_MS)
             throw new IOException("请选择有效时间范围，单次最多 93 天");

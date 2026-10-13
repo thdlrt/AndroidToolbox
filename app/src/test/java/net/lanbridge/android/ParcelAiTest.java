@@ -13,6 +13,17 @@ public class ParcelAiTest {
     private String result(JSONObject... rows)throws Exception{return new JSONObject().put("items",new JSONArray(Arrays.asList(rows))).toString();}
     private MockResponse response(String content)throws Exception{return new MockResponse().setBody(new JSONObject().put("choices",new JSONArray().put(new JSONObject().put("finish_reason","stop").put("message",new JSONObject().put("content",content)))).toString());}
     @Test public void verifiesSourceCodesAndAllowsLocationNormalization()throws Exception{List<ParcelAi.Item> items=ParcelAi.parseResponse(result(row("1","８-１２３４",ParcelAi.PENDING)),List.of(message("1","取件码8-1234，请到校内的菜鸟驿站。")));assertEquals("８-１２３４",items.get(0).code);assertFalse(items.get(0).requiresReview);}
+    @Test public void stationSignatureArrivalKeepsCompleteSegmentedCodeAndLiteralDeadline()throws Exception{
+        List<ParcelSms.Message> sources=List.of(message("station","【驿小哥】您的菜鸟速递包裹已到某大学校区六栋菜根谭快递点，请23:30前凭68-4-2468来取，谢谢。"));
+        JSONObject extracted=row("station","68-4-2468",ParcelAi.PENDING).put("carrier","菜鸟速递").put("location","某大学校区六栋菜根谭快递点").put("locker","").put("deadline","23:30前");
+        try(MockWebServer server=new MockWebServer()){
+            server.enqueue(response(result(extracted)));server.start();
+            ParcelAi.Item item=ParcelAi.parse(new ParcelAi.Config(server.url("/v1").toString(),"test","m"),sources,List.of()).get(0);
+            assertEquals("68-4-2468",item.code);assertEquals("菜鸟速递",item.carrier);assertEquals("23:30前",item.deadline);assertEquals(ParcelAi.PENDING,item.status);assertEquals("",item.locker);
+            JSONObject payload=new JSONObject(server.takeRequest().getBody().readUtf8());assertTrue(payload.getJSONArray("messages").getJSONObject(0).getString("content").contains("到站通知不要求出现“取件码”三个字"));
+        }
+        for(JSONObject wrong:new JSONObject[]{new JSONObject(extracted.toString()).put("code","2468"),new JSONObject(extracted.toString()).put("code","6842468"),new JSONObject(extracted.toString()).put("deadline","今天23:30前")})try{ParcelAi.parseResponse(result(wrong),sources);fail("Invented or shortened evidence accepted");}catch(IOException expected){}
+    }
     @Test public void rejectsHallucinatedSourceCodeStatusAndIncompleteCoverage()throws Exception{
         List<ParcelSms.Message> sources=List.of(message("1","取件码1234"));String[] invalid={result(row("other","1234",ParcelAi.PENDING)),result(row("1","9876",ParcelAi.PENDING)),result(row("1","1234","可能待取")),"{\"items\":[]}"};for(String value:invalid)try{ParcelAi.parseResponse(value,sources);fail();}catch(IOException expected){assertFalse(expected.getMessage().contains("9876"));}
     }
