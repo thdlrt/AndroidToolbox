@@ -28,11 +28,11 @@ final class ParcelAutoReader {
         try{
             if(context.checkSelfPermission(Manifest.permission.READ_SMS)!=PackageManager.PERMISSION_GRANTED)throw new IllegalStateException("自动读取需要短信权限，请在取件设置中授予权限");
             ParcelAi.Config config=new AiSettings(context).parcelConfig(true);int days=days(context);long now=System.currentTimeMillis();
-            List<ParcelSms.Message> messages=ParcelSms.queryForImport(context,ParcelAutoPolicy.start(now,days,java.time.ZoneId.systemDefault()),now);
-            int count=importItems(context,messages,Collections.emptyList(),config,true);
-            status=count==0?"自动读取完成，没有新的取件信息":"自动读取完成，已更新 "+count+" 条取件信息";
+            ParcelScan scan;try(ParcelStore store=new ParcelStore(context)){scan=ParcelScan.read(context,ParcelAutoPolicy.start(now,days,java.time.ZoneId.systemDefault()),now,store,false);}
+            int count=importItems(context,scan.pending,Collections.emptyList(),config,true);
+            status=scan.pending.isEmpty()?"自动读取完成："+scan.emptyReason():count==0?"自动读取已分析 "+scan.pending.size()+" 条短信，AI 未生成新的取件记录":"自动读取完成，已更新 "+count+" 条取件信息";
             prefs(context).edit().putLong("last_success",now).apply();
-        }catch(Exception e){status="自动读取未完成："+(e.getMessage()==null?"请稍后重试":e.getMessage());}
+        }catch(Exception e){RuntimeLog.failure(context,"自动读取",e);status="自动读取未完成："+(e.getMessage()==null?"请稍后重试":e.getMessage());}
         finally{prefs(context).edit().putString("status",status).apply();running=false;gate.end();revision++;}
     });}
     static int importItems(Context context,List<ParcelSms.Message> sources,List<ParcelAi.Image> images,ParcelAi.Config config,boolean automatic)throws Exception{
@@ -43,8 +43,9 @@ final class ParcelAutoReader {
             retryUnmatched=retryUnmatched&&!automatic;
             if(automatic&&!enabled(context))throw new IllegalStateException("自动读取已关闭");
             try(ParcelStore store=new ParcelStore(context.getApplicationContext())){
-                List<ParcelSms.Message> pending=store.pendingSources(sources,retryUnmatched);if(pending.isEmpty())return 0;
-                List<ParcelAi.Item> items=ParcelAi.parse(config,pending,images);return store.ingest(pending,items,retryUnmatched);
+                List<ParcelSms.Message> pending=store.pendingSources(sources,retryUnmatched);if(pending.isEmpty()){RuntimeLog.record(context,"AI跳过","输入="+sources.size()+"；待处理=0；来源均已处理或重复");return 0;}
+                RuntimeLog.record(context,"AI开始","来源="+pending.size()+"；图片="+images.size()+"；思考="+config.reasoning+"；自动="+automatic);
+                try{List<ParcelAi.Item> items=ParcelAi.parse(config,pending,images);int waiting=0,delivering=0,collected=0,other=0;for(ParcelAi.Item item:items){if(item.status.equals(ParcelAi.PENDING))waiting++;else if(item.status.equals(ParcelAi.DELIVERY))delivering++;else if(item.status.equals(ParcelAi.COLLECTED))collected++;else other++;}RuntimeLog.record(context,"AI结果","待取="+waiting+"；派送="+delivering+"；已取="+collected+"；非快递="+other);int count=store.ingest(pending,items,retryUnmatched);RuntimeLog.record(context,"快递入库","更新="+count+"；来源="+pending.size());return count;}catch(Exception e){RuntimeLog.failure(context,"AI或入库",e);throw e;}
             }
         }
     }

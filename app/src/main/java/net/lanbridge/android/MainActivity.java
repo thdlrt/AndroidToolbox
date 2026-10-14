@@ -35,6 +35,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
     }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        RuntimeLog.record(this,"应用启动","版本="+BuildConfig.VERSION_NAME+"；Android="+android.os.Build.VERSION.RELEASE+"；设备="+android.os.Build.MANUFACTURER+" "+android.os.Build.MODEL);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         try{ConfigBackupService.recoverPending(this);}catch(Exception e){Toast.makeText(this,"本机配置恢复未完成，请重试",Toast.LENGTH_LONG).show();}
         LinearLayout body = ToolUi.column(this);

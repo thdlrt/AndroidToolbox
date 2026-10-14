@@ -130,3 +130,11 @@
 - 真实 qwen3.8-flash 调用明确传 enable_thinking=true、thinking_budget=16384；响应包含 reasoning_content，最终 content 正确提取用户提供的驿小哥通知。思考过程不用于业务入库；仅验证这一模型与这条短信，未将模拟接口结果当作全模型准确率证据。
 - 参数按百炼、DeepSeek与OpenAI当前官方说明适配；关键词及思考偏好在本机独立保存，未改变现有 PC 共享配置格式。
 - 签名 APK outputs/AndroidToolbox-0.6.9.apk：net.lanbridge.android，0.6.9/code20，APK SHA-256 f4f27ad6e726ab106a9ae2cfee53e368b72884ffdc9b1e9fe919a7f537b21a11；签名证书与历史一致。模拟器覆盖安装和启动通过。未操作实体手机，未发布 GitHub Release。
+
+## 2026-10-14 · 0.6.10 读取诊断与应用内日志
+
+- JVM 85 项：84 通过、1 项真实 NAS 按默认策略跳过，无失败。新增跨天/月日期范围、日志轮换/清空及丰巢关键词匹配测试。
+- emulator-5570：14 项新增调试验收通过。真实系统短信收件箱注入唯一合成丰巢通知和验证码，经实际界面操作验证跨天快捷日期刷新、无需 AI 配置的读取诊断、已处理来源计数、模拟 AI 非快递分类、显式重扫后完整取件记录入库，以及设置中的日志查看和复制。只读诊断没有 HTTP 请求；两次分析请求均只上传命中的丰巢测试通知。日志检查排除短信正文、取件码、验证码、网址与密钥。脚本 scripts/smoke-parcel-debug.py，结果与截图 outputs/parcel-debug-validation。
+- 已有 38 项取件/AI 界面、37 项 SQLite、14 项地点及21项编辑回归通过。
+- 使用电脑现有配置的 qwen3.8-flash，对用户提供的一条丰巢通知实测中档思考：响应包含思考内容，最终字段完整保留取件码、站点、室内14号丰巢柜和待取状态；思考内容不用于业务入库，未访问通知中的网址。只能证明此模型能识别这一条，用户手机的实际漏读原因仍需本机诊断与日志确认。
+- 正式签名 APK outputs/AndroidToolbox-0.6.10.apk：net.lanbridge.android，0.6.10/code21，13948428 字节，SHA-256 2d1ee3b535a5e1325c3723b25ae9f3294d221f519faf9f925adba71398917848。v2 签名通过，历史证书 SHA-256 f299b831be45343d8f2fb1b6f2c6557075946f93ab099fd1b4d746f1fd2501d7。模拟器从正式0.6.9覆盖升级及冷启动通过；未操作实体手机，未发布 GitHub Release。

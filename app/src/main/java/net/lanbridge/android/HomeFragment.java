@@ -68,6 +68,7 @@ public final class HomeFragment extends ToolFragment {
         LoginStore shared=WebDavSettings.store(context());
         settingRow("cloud","WebDAV 与备份",shared.hasPassword()?"已配置 · 统一连接与同步":"连接设置与配置备份",()->startActivity(new Intent(context(),WebDavActivity.class)));
         settingRow("ai","AI 设置","供应商与多模态模型",()->startActivity(new Intent(context(),AiSettingsActivity.class)));
+        settingRow("file","运行日志","读取、过滤、AI与入库调试信息",()->RuntimeLog.show(context()));
         TextView about=text("关于应用",14);about.setTextColor(ToolUi.MUTED);about.setPadding(0,dp(24),0,dp(12));content.addView(about);
         LinearLayout c=card();c.addView(text("应用更新",20));c.addView(text("安卓工具箱 "+BuildConfig.VERSION_NAME,15));
         updateState=text(AppUpdater.get(context()).message,14);c.addView(updateState);

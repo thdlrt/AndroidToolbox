@@ -68,4 +68,9 @@ public final class ParcelSms {
         } catch (SecurityException e) { throw new IOException("需要允许读取短信，才能查询所选日期的收件箱"); }
         return result;
     }
+    static String inboxSummary(Context context)throws IOException{
+        try(Cursor cursor=context.getContentResolver().query(Telephony.Sms.Inbox.CONTENT_URI,new String[]{Telephony.Sms.DATE},null,null,Telephony.Sms.DATE+" DESC")){
+            if(cursor==null)throw new IOException("系统收件箱未返回数据");int total=cursor.getCount();String summary="系统收件箱总数："+total;if(cursor.moveToFirst())summary+="\n最新收件时间："+ParcelScan.format(cursor.getLong(0));RuntimeLog.record(context,"收件箱诊断",summary);return summary;
+        }catch(SecurityException e){throw new IOException("需要读取短信权限");}
+    }
 }
