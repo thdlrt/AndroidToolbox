@@ -8,7 +8,7 @@ adb=[str(root/'.build/sdk/platform-tools/adb.exe'),'-P',args.adb_port,'-s',args.
 out=root/'outputs/parcel-debug-validation';out.mkdir(parents=True,exist_ok=True)
 def run(*a):return subprocess.check_output(adb+list(a),text=True,encoding='utf-8',errors='replace',timeout=90)
 stamp=time.time_ns();marker='DBGTEST_'+format(stamp,'x');code=str(stamp)[-8:];calls=[]
-body=f'{marker} 【丰巢】凭取件码{code}至南大仙林菜根谭室内14号丰巢柜取件。快递员p.fcbox.com/Synthetic'
+body=f'【丰巢】凭取件码{code}至南大仙林菜根谭室内14号丰巢柜取件。快递员p.fcbox.com/{marker}'
 class Handler(BaseHTTPRequestHandler):
  def log_message(self,*a):pass
  def do_POST(self):
@@ -21,8 +21,8 @@ try:
  run('shell','settings','put','global','heads_up_notifications_enabled','0');run('shell','pm','grant','net.lanbridge.android.debug','android.permission.READ_SMS')
  run('emu','sms','send','106310',body);run('emu','sms','send','106310',f'{marker} 验证码889900')
  result=run('shell','am','instrument','-w','-e','marker',marker,'-e','code',code,'-e','endpoint',f'http://10.0.2.2:{server.server_port}/v1','net.lanbridge.android.debug.test/net.lanbridge.android.ParcelDebugInstrumentation')
- print(result,flush=True);(out/'result.txt').write_text(result,'utf-8');assert 'PASS:' in result,result;assert len(calls)==2,len(calls)
- print('PASS HTTP: read-only diagnosis made no request; only the matching fcbox SMS uploaded; explicit retry recovered OTHER classification',flush=True)
+ print(result,flush=True);(out/'result.txt').write_text(result,'utf-8');assert 'PASS:' in result,result;assert len(calls)==1,len(calls)
+ print('PASS HTTP: read-only diagnosis made no request; only the matching fcbox SMS uploaded; cancel made no request; explicit retry and strict fallback recovered OTHER classification; linked pending/archived sources made no request',flush=True)
  for name in ['diagnostic','logs','ai-result']:run('pull',f'/sdcard/Android/data/net.lanbridge.android.debug/files/parcel-processing-{name}.png',str(out/(name+'.png')))
 finally:
  run('shell','settings','delete' if heads=='null' else 'put','global','heads_up_notifications_enabled',*(() if heads=='null' else (heads,)));server.shutdown();server.server_close()

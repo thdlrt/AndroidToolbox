@@ -56,7 +56,24 @@ public final class ParcelStore extends SQLiteOpenHelper {
     private static boolean processed(SQLiteDatabase db,String fingerprint){try(Cursor c=db.rawQuery("SELECT 1 FROM processed WHERE fingerprint=?",new String[]{fingerprint})){return c.moveToFirst();}}
     private static boolean linked(SQLiteDatabase db,String fingerprint){try(Cursor c=db.rawQuery("SELECT 1 FROM parcel_sources WHERE fingerprint=? LIMIT 1",new String[]{fingerprint})){return c.moveToFirst();}}
     public synchronized List<ParcelSms.Message> pendingSources(List<ParcelSms.Message> input){return pendingSources(input,false);}
-    public synchronized List<ParcelSms.Message> pendingSources(List<ParcelSms.Message> input,boolean retryUnmatched){SQLiteDatabase db=getReadableDatabase();List<ParcelSms.Message> result=new ArrayList<>();Set<String> seen=new HashSet<>();for(ParcelSms.Message message:input)if(seen.add(message.fingerprint)&&(!processed(db,message.fingerprint)||retryUnmatched&&message.imageSha256==null&&!linked(db,message.fingerprint)))result.add(message);return result;}
+    static final class SourceSelection {
+        final List<ParcelSms.Message> pending,unlinked;
+        final int duplicates,waiting,archived;
+        SourceSelection(List<ParcelSms.Message> pending,List<ParcelSms.Message> unlinked,int duplicates,int waiting,int archived){this.pending=Collections.unmodifiableList(pending);this.unlinked=Collections.unmodifiableList(unlinked);this.duplicates=duplicates;this.waiting=waiting;this.archived=archived;}
+    }
+    public synchronized List<ParcelSms.Message> pendingSources(List<ParcelSms.Message> input,boolean retryUnmatched){return selectSources(input,retryUnmatched).pending;}
+    synchronized SourceSelection selectSources(List<ParcelSms.Message> input,boolean retryUnmatched){
+        SQLiteDatabase db=getReadableDatabase();List<ParcelSms.Message> pending=new ArrayList<>(),unlinked=new ArrayList<>();Set<String> seen=new HashSet<>();int duplicates=0,waiting=0,archived=0;
+        for(ParcelSms.Message message:input){
+            if(!seen.add(message.fingerprint)){duplicates++;continue;}
+            if(!processed(db,message.fingerprint)){pending.add(message);continue;}
+            try(Cursor c=db.rawQuery("SELECT MIN(p.collected) FROM parcel_sources s JOIN parcels p ON p.id=s.parcel_id WHERE s.fingerprint=?",new String[]{message.fingerprint})){
+                c.moveToFirst();if(!c.isNull(0)){if(c.getInt(0)==0)waiting++;else archived++;continue;}
+            }
+            if(message.imageSha256==null){unlinked.add(message);if(retryUnmatched)pending.add(message);}
+        }
+        return new SourceSelection(pending,unlinked,duplicates,waiting,archived);
+    }
 
     /** Validate everything first; on any failure neither rows nor processed markers are committed. */
     public synchronized int ingest(List<ParcelSms.Message> messages,List<ParcelAi.Item> items)throws IOException{
