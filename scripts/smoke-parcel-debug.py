@@ -23,6 +23,6 @@ try:
  result=run('shell','am','instrument','-w','-e','marker',marker,'-e','code',code,'-e','endpoint',f'http://10.0.2.2:{server.server_port}/v1','net.lanbridge.android.debug.test/net.lanbridge.android.ParcelDebugInstrumentation')
  print(result,flush=True);(out/'result.txt').write_text(result,'utf-8');assert 'PASS:' in result,result;assert len(calls)==1,len(calls)
  print('PASS HTTP: read-only diagnosis made no request; only the matching fcbox SMS uploaded; cancel made no request; explicit retry and strict fallback recovered OTHER classification; linked pending/archived sources made no request',flush=True)
- for name in ['diagnostic','logs','ai-result']:run('pull',f'/sdcard/Android/data/net.lanbridge.android.debug/files/parcel-processing-{name}.png',str(out/(name+'.png')))
+ for name in ['diagnostic','logs','ai-result','input']:run('pull',f'/sdcard/Android/data/net.lanbridge.android.debug/files/parcel-processing-{name}.png',str(out/(name+'.png')))
 finally:
  run('shell','settings','delete' if heads=='null' else 'put','global','heads_up_notifications_enabled',*(() if heads=='null' else (heads,)));server.shutdown();server.server_close()
