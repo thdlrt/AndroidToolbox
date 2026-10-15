@@ -39,9 +39,15 @@ final class ParcelAutoReader {
         return importItems(context,sources,images,config,automatic,false);
     }
     static int importItems(Context context,List<ParcelSms.Message> sources,List<ParcelAi.Image> images,ParcelAi.Config config,boolean automatic,boolean retryUnmatched)throws Exception{
+        return importItems(context,sources,images,config,automatic,retryUnmatched,false);
+    }
+    static int importNotificationItems(Context context,List<ParcelSms.Message> sources,ParcelAi.Config config)throws Exception{
+        return importItems(context,sources,Collections.emptyList(),config,true,false,true);
+    }
+    private static int importItems(Context context,List<ParcelSms.Message> sources,List<ParcelAi.Image> images,ParcelAi.Config config,boolean automatic,boolean retryUnmatched,boolean notification)throws Exception{
         synchronized(IMPORT_LOCK){
             retryUnmatched=retryUnmatched&&!automatic;
-            if(automatic&&!enabled(context))throw new IllegalStateException("自动读取已关闭");
+            if(automatic&&!(notification?ParcelNotifications.enabled(context)&&ParcelNotifications.access(context):enabled(context)))throw new IllegalStateException("自动导入已关闭或未授权");
             try(ParcelStore store=new ParcelStore(context.getApplicationContext())){
                 List<ParcelSms.Message> pending=store.pendingSources(sources,retryUnmatched);if(pending.isEmpty()){RuntimeLog.record(context,"AI跳过","输入="+sources.size()+"；待处理=0；来源均已处理或重复");return 0;}
                 RuntimeLog.record(context,"AI开始","来源="+pending.size()+"；图片="+images.size()+"；模型="+ParcelInput.safeModel(config.model)+"；协议="+ParcelReasoning.protocol(config)+"；思考="+config.reasoning+"；自动="+automatic);RuntimeLog.record(context,"AI输入概要",ParcelInput.summary(pending));

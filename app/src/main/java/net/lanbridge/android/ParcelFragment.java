@@ -29,12 +29,14 @@ public final class ParcelFragment extends ToolFragment {
     private LinearLayout rows;
     private Spinner filter,sort;
     private boolean busy;
+    private Intent pendingShare;
     private boolean retryUnmatched,checkOnly;
     private int presetDays=3;
     private ParcelStore store;
     private final android.os.Handler autoHandler=new android.os.Handler(android.os.Looper.getMainLooper());
     private long autoRevision=-1;
-    private final Runnable autoRefresh=new Runnable(){public void run(){ParcelAutoReader reader=ParcelAutoReader.get(context());if(!busy&&reader.revision!=autoRevision){autoRevision=reader.revision;if(ParcelAutoReader.enabled(context())){status.setText(reader.status);refresh();}}autoHandler.postDelayed(this,700);}};
+    private long notificationRevision=-1;
+    private final Runnable autoRefresh=new Runnable(){public void run(){ParcelAutoReader reader=ParcelAutoReader.get(context());if(!busy&&reader.revision!=autoRevision){autoRevision=reader.revision;if(ParcelAutoReader.enabled(context())){status.setText(reader.status);refresh();}}ParcelNotifications notifications=ParcelNotifications.get(context());if(!busy&&notificationRevision!=notifications.revision){notificationRevision=notifications.revision;if(ParcelNotifications.enabled(context())){if(!notifications.status.isEmpty())status.setText(notifications.status);refresh();}}autoHandler.postDelayed(this,700);}};
     private String filterMode="pending",sortMode="address";
     @Override protected View createContent(Bundle state){
         store=new ParcelStore(context().getApplicationContext());
@@ -55,10 +57,12 @@ public final class ParcelFragment extends ToolFragment {
         ToolUi.space(form,ToolUi.text(context(),ParcelAutoReader.get(context()).status,13,ToolUi.MUTED));
         Button organize=ToolUi.button(context(),"整理地点",false,()->{});ToolUi.space(form,organize);
         Button keywords=ToolUi.button(context(),"短信快速过滤",false,()->{});ToolUi.space(form,keywords);
+        Button notifications=ToolUi.button(context(),"5G消息通知导入",false,()->{});ToolUi.space(form,notifications);
         ScrollView settingsScroll=new ScrollView(context());settingsScroll.addView(form);
         AlertDialog dialog=new com.google.android.material.dialog.MaterialAlertDialogBuilder(context()).setTitle("取件设置").setView(settingsScroll).setNeutralButton("AI 设置",(d,w)->navigate("ai-settings")).setNegativeButton("取消",null).setPositiveButton("保存",null).create();
         organize.setOnClickListener(v->{if(busy)return;dialog.dismiss();organizeLocations();});
         keywords.setOnClickListener(v->{if(busy)return;dialog.dismiss();keywordSettings();});
+        notifications.setOnClickListener(v->{if(busy)return;dialog.dismiss();ParcelNotificationSettings.show(context(),()->refresh());});
         dialog.setOnShowListener(d->dialog.getButton(-1).setOnClickListener(v->{try{int range=Integer.parseInt(days.getText().toString().trim());ParcelAutoPolicy.days(range);if(toggle.isChecked())new AiSettings(context()).parcelConfig(true);ParcelAutoReader.configure(context(),toggle.isChecked(),range);dialog.dismiss();if(toggle.isChecked()){if(checkSelfPermission(Manifest.permission.READ_SMS)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.READ_SMS},AUTO_PERMISSION);else ParcelAutoReader.get(context()).request(true);}else status.setText("自动读取已关闭");}catch(Exception e){days.setError(e.getMessage()==null?"请填写 1–93 天":e.getMessage());}}));dialog.show();
     }
     private void keywordSettings(){
@@ -110,7 +114,7 @@ public final class ParcelFragment extends ToolFragment {
     private boolean ready(boolean vision){try{AiSettings settings=new AiSettings(context());settings.parcelConfig(vision);return true;}catch(Exception e){error(e);return false;}}
     private void scan(){if(busy||!checkOnly&&!ready(false))return;rollDates();RuntimeLog.record(context(),"手动扫描开始","模式="+(checkOnly?"仅检查读取":"AI分析")+"；日期="+start+" 至 "+end+"；短信权限="+(checkSelfPermission(Manifest.permission.READ_SMS)==PackageManager.PERMISSION_GRANTED));if(end.isBefore(start)||ChronoUnit.DAYS.between(start,end)>92){error(new IllegalArgumentException("请选择不超过 93 天的有效日期范围"));return;}if(checkSelfPermission(Manifest.permission.READ_SMS)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.READ_SMS},SMS_PERMISSION);return;}readSms();}
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(request==AUTO_PERMISSION){if(grants.length>0&&grants[0]==PackageManager.PERMISSION_GRANTED)ParcelAutoReader.get(context()).request(true);else status.setText("未授予短信权限，可在取件设置中重新开启或使用粘贴/相册导入");return;}if(request!=SMS_PERMISSION)return;if(grants.length>0&&grants[0]==PackageManager.PERMISSION_GRANTED){if(checkOnly||ready(false))readSms();}else {RuntimeLog.record(context(),"短信权限","用户未授予读取短信权限");status.setText("未获得读取短信权限。可以使用“从剪贴板粘贴”或“从相册选择”导入，无需短信权限。");}}
-    private void readSms(){rollDates();boolean retry=retryUnmatched,diagnose=checkOnly;LocalDate from=start,to=end;long first=from.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli(),last=to.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()-1;setBusy(true,"正在读取所选日期短信，尚未发送给 AI…");worker.execute(()->{try{ParcelScan scan=ParcelScan.read(context().getApplicationContext(),first,last,store,retry);String provider=diagnose?ParcelSms.inboxSummary(context()):"";ui(()->{setBusy(false,"");if(diagnose){String report="短信权限：已授权\n读取来源：系统收件箱\n"+provider+"\n\n"+scan.summary().replace("；","\n")+"\n\n"+(scan.pending.isEmpty()?scan.emptyReason():"已读取到 "+scan.pending.size()+" 条待分析短信。本次只检查读取，未发送给 AI。")+"\n\n可在运行日志查看后续AI状态。此检查不修改已处理标记。";new com.google.android.material.dialog.MaterialAlertDialogBuilder(context()).setTitle("短信读取诊断").setMessage(report).setNeutralButton("查看原文",(d,w)->readSources(scan.readSources)).setPositiveButton("查看日志",(d,w)->RuntimeLog.show(context())).setNegativeButton("关闭",null).show();status.setText("读取检查完成，未调用 AI");return;}if(scan.pending.isEmpty()){status.setText(scan.emptyReason());if(!scan.unlinked.isEmpty())new com.google.android.material.dialog.MaterialAlertDialogBuilder(context()).setTitle("重新识别未生成记录的短信？").setNeutralButton("查看原文",(d,w)->readSources(scan.unlinked)).setMessage("已读到 "+scan.unlinked.size()+" 条以前分析过、但没有关联快递记录的短信，可能是非取件通知或模型漏识别。重新识别会将这些短信发给已配置的 AI，已有待取和归档记录继续跳过。").setNegativeButton("取消",null).setPositiveButton("重新识别",(d,w)->{RuntimeLog.record(context(),"手动重试","无关联记录来源="+scan.unlinked.size());analyze(scan.unlinked,Collections.emptyList(),true);}).show();return;}status.setText("已读取 "+scan.read+" 条，匹配 "+scan.matched+" 条，待分析 "+scan.pending.size()+" 条");analyze(scan.pending,Collections.emptyList(),retry);});}catch(Exception e){RuntimeLog.failure(context(),"手动读取",e);ui(()->{setBusy(false,"读取失败，可复制短信后从剪贴板导入。");error(e);});}});}
+    private void readSms(){rollDates();boolean retry=retryUnmatched,diagnose=checkOnly;LocalDate from=start,to=end;long first=from.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli(),last=to.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()-1;setBusy(true,"正在读取所选日期短信，尚未发送给 AI…");worker.execute(()->{try{ParcelScan scan=ParcelScan.read(context().getApplicationContext(),first,last,store,retry);String provider=diagnose?ParcelSms.inboxSummary(context()):"";ui(()->{setBusy(false,"");if(diagnose){String report="短信权限：已授权\n读取来源：系统收件箱\n"+provider+"\n\n"+scan.summary().replace("；","\n")+"\n\n"+(scan.pending.isEmpty()?scan.emptyReason():"已读取到 "+scan.pending.size()+" 条待分析短信。本次只检查读取，未发送给 AI。")+"\n\n5G／增强消息可能不在系统短信库中。缺少的消息可从短信应用分享到取件助手，或复制后从剪贴板导入。此检查不修改已处理标记。";new com.google.android.material.dialog.MaterialAlertDialogBuilder(context()).setTitle("短信读取诊断").setMessage(report).setNeutralButton("查看原文",(d,w)->readSources(scan.readSources)).setPositiveButton("查看日志",(d,w)->RuntimeLog.show(context())).setNegativeButton("关闭",null).show();status.setText("读取检查完成，未调用 AI");return;}if(scan.pending.isEmpty()){status.setText(scan.emptyReason());if(!scan.unlinked.isEmpty())new com.google.android.material.dialog.MaterialAlertDialogBuilder(context()).setTitle("重新识别未生成记录的短信？").setNeutralButton("查看原文",(d,w)->readSources(scan.unlinked)).setMessage("已读到 "+scan.unlinked.size()+" 条以前分析过、但没有关联快递记录的短信，可能是非取件通知或模型漏识别。重新识别会将这些短信发给已配置的 AI，已有待取和归档记录继续跳过。").setNegativeButton("取消",null).setPositiveButton("重新识别",(d,w)->{RuntimeLog.record(context(),"手动重试","无关联记录来源="+scan.unlinked.size());analyze(scan.unlinked,Collections.emptyList(),true);}).show();return;}status.setText("已读取 "+scan.read+" 条，匹配 "+scan.matched+" 条，待分析 "+scan.pending.size()+" 条");analyze(scan.pending,Collections.emptyList(),retry);});}catch(Exception e){RuntimeLog.failure(context(),"手动读取",e);ui(()->{setBusy(false,"读取失败，可复制短信后从剪贴板导入。");error(e);});}});}
 
     private void readSources(List<ParcelSms.Message> sources){
         if(sources.isEmpty()){new com.google.android.material.dialog.MaterialAlertDialogBuilder(context()).setTitle("系统实际读取短信").setMessage("所选日期没有读取到短信。").setPositiveButton("关闭",null).show();return;}
@@ -135,6 +139,22 @@ public final class ParcelFragment extends ToolFragment {
             if(body.length()>200000)throw new IllegalArgumentException("剪贴板内容过长，请分批复制（最多 200000 字符）");
             analyze(Collections.singletonList(new ParcelSms.Message("manual:"+UUID.randomUUID(),System.currentTimeMillis(),"剪贴板粘贴",body)),Collections.emptyList());
         }catch(SecurityException e){error(new IllegalStateException("无法读取剪贴板，请返回应用并重新复制短信后再试"));}catch(Exception e){error(e);}
+    }
+    void receiveIntent(Intent intent){
+        if(!Intent.ACTION_SEND.equals(intent.getAction()))return;
+        if(getView()==null){pendingShare=new Intent(intent);return;}
+        if(busy){error(new IllegalStateException("正在处理取件信息，请完成后重新分享"));return;}
+        try{
+            if(!"text/plain".equals(intent.getType())||intent.hasExtra(Intent.EXTRA_STREAM))throw new IllegalArgumentException("请选择短信正文，以纯文字分享到取件助手");
+            CharSequence text=intent.getCharSequenceExtra(Intent.EXTRA_TEXT);
+            if(text==null||text.toString().trim().isEmpty())throw new IllegalArgumentException("分享内容没有文字，请在短信应用中选择消息正文后分享");
+            String body=text.toString().trim();
+            if(body.length()>200000)throw new IllegalArgumentException("分享内容过长，请分批分享（最多 200000 字符）");
+            RuntimeLog.record(context(),"分享导入","来源=用户分享；正文长度="+body.length());
+            status.setText("已收到分享正文，正在准备分析…");
+            if(!ready(false)){status.setText("请先配置取件 AI，再从短信应用重新分享，或复制后从剪贴板导入");return;}
+            analyze(List.of(new ParcelSms.Message("share:"+UUID.randomUUID(),System.currentTimeMillis(),"短信分享",body)),Collections.emptyList());
+        }catch(Exception e){error(e);}
     }
     private void pickImage(){if(busy||!ready(true))return;Intent intent=ToolUi.photoPicker();try{startActivityForResult(intent,PICK_IMAGE);}catch(Exception e){error(e);}}
     @Override public void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request!=PICK_IMAGE||result!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();setBusy(true,"正在读取所选图片…");worker.execute(()->{try{String mime=getContentResolver().getType(uri);ByteArrayOutputStream out=new ByteArrayOutputStream();try(InputStream input=getContentResolver().openInputStream(uri)){if(input==null)throw new IllegalArgumentException("无法读取图片");byte[] buffer=new byte[8192];int count;while((count=input.read(buffer))!=-1){if(out.size()+count>5*1024*1024)throw new IllegalArgumentException("图片最多 5 MiB，请压缩后重试");out.write(buffer,0,count);}}ParcelAi.Image value=new ParcelAi.Image(mime,out.toByteArray());ui(()->{setBusy(false,"");ParcelSms.Message source=new ParcelSms.Message("image:"+UUID.randomUUID(),System.currentTimeMillis(),"相册导入","提取图片中的取件通知",value.sha256);analyze(Collections.singletonList(source),Collections.singletonList(value));});}catch(Exception e){ui(()->{setBusy(false,"");error(e);});}});}
@@ -165,7 +185,7 @@ public final class ParcelFragment extends ToolFragment {
     private void ui(Runnable action){runOnUiThread(()->{if(isAdded()&&getView()!=null)action.run();});}
     private static String value(String text,String fallback){return text==null||text.trim().isEmpty()?fallback:text;}
     private static String dateTime(long time){return new java.text.SimpleDateFormat("MM-dd HH:mm",Locale.getDefault()).format(new Date(time));}
-    @Override protected void onPageResume(){refresh();autoHandler.post(autoRefresh);}
+    @Override protected void onPageResume(){refresh();autoHandler.post(autoRefresh);if(pendingShare!=null){Intent incoming=pendingShare;pendingShare=null;receiveIntent(incoming);}}
     @Override protected void onPagePause(){autoHandler.removeCallbacks(autoRefresh);}
     @Override public void onSaveInstanceState(Bundle state){super.onSaveInstanceState(state);state.putString("start",start.toString());state.putString("end",end.toString());state.putInt("preset_days",presetDays);}
     @Override public void onDestroy(){worker.execute(()->{if(store!=null)store.close();});worker.shutdown();super.onDestroy();}

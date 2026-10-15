@@ -89,6 +89,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         }
         page = id;
         transaction.commitNow();
+        if (incoming != null && next instanceof ParcelFragment) ((ParcelFragment)next).receiveIntent(new Intent(incoming));
         shell.selected((page.equals("webdav") || page.equals("ai-settings")) ? "settings" : page);
         renderBottom();
     }
@@ -108,12 +109,14 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
     }
     private void handleIntent(Intent intent) {
         String target=intent.getStringExtra("page");
+        if(target==null)target=pageFor(intent.getComponent());
         boolean shared=Intent.ACTION_VIEW.equals(intent.getAction())||Intent.ACTION_SEND.equals(intent.getAction())||Intent.ACTION_SEND_MULTIPLE.equals(intent.getAction());
-        show(shared?"relay":target==null?"home":target,false,shared?intent:null);
+        boolean parcelShare=shared&&"parcel".equals(target)&&Intent.ACTION_SEND.equals(intent.getAction());
+        show(parcelShare?"parcel":shared?"relay":target==null?"home":target,false,shared?intent:null);
         intent.setAction(null);
     }
     @Override protected void onNewIntent(Intent intent) { super.onNewIntent(intent);setIntent(intent);handleIntent(intent); }
-    @Override protected void onStart(){super.onStart();ParcelAutoReader.get(this).opened();}
+    @Override protected void onStart(){super.onStart();ParcelAutoReader.get(this).opened();ParcelNotifications.get(this).opened();}
     @Override protected void onResume() { super.onResume();AppUpdater.get(this).resumeInstall(this);observedSync=DataSyncManager.get(this).lastSuccess;DataSyncManager.get(this).requestAll(DataSyncManager.Trigger.STARTUP);syncHandler.post(syncRefresh); }
     @Override protected void onPause(){syncHandler.removeCallbacks(syncRefresh);super.onPause();}
     @Override protected void onSaveInstanceState(Bundle state) { super.onSaveInstanceState(state);state.putString("page",page);state.putString("connectionReturn",connectionReturn);state.putString("aiReturn",aiReturn); }

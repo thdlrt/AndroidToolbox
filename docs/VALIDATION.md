@@ -154,3 +154,13 @@
 - JVM93项：92通过、1项真实NAS默认跳过，无失败。新增输入概要的隐私、空正文/普通短信/丰巢区分、格式字符计数及日志模型名限制测试。
 - emulator-5570的23项调试验收通过：打乱MatrixCursor列顺序后仍提取正确ID/日期/发送方/正文；真实系统短信读取后，实际原文查看与复制保持完整正文，未调用AI或修改处理标记。既有重试取消、补救入库、待取/归档跳过和日志隐私检查通过。截图 outputs/parcel-debug-validation/input.png。
 - 签名 APK outputs/AndroidToolbox-0.6.12.apk：net.lanbridge.android，0.6.12/code23，13948432字节，SHA-256 a25fd70d446ed648702d1a2b80b84da90f898bcf5196555b5a8accdc495a5051；v2签名通过，与历史证书一致。未操作实体手机，未发布GitHub Release。
+
+
+## 2026-10-15 · 0.6.13 5G消息通知与分享导入
+
+- 用户确认丰巢通知为5G／增强／服务号消息，普通短信原文列表没有它；剪贴板能生成记录。采用用户选择的通知导入方案，普通SMS查询保持原样，保留分享和复制入口。
+- 新通知监听默认关闭，系统授权后只缓存选定应用命中快递关键词的通知，打开工具箱才调用AI。独立14天/500条缓存，失败保留待处理项，可手动重试/清空；与短信权限和自动扫描开关独立。设置可查看授权、连接、缓存和状态。
+- emulator-5570 / Android 15：17项真实系统通知验收通过，包含BigText和MessagingStyle、开关/来源/关键词拦截、磁盘持久化、重复更新、无界面时HTTP请求为0、打开应用后处理、HTTP503后缓存保留且重试原文一致、日志无正文/码/密钥。测试仅在该模拟器授权监听并恢复原授权状态，未操作用户手机。
+- 9项分享验收通过：纯文字分享入口、应用关闭时启动、已打开时接收、无SMS权限、完整原文入库、空分享无请求、重建不重复。修复首次分享早于Fragment控件初始化，以及NEW_TASK复用入口时的转发；普通扫描23项回归通过。
+- 92项JVM测试通过，1项默认NAS测试跳过；签名构建及lintVital通过。测试回执在outputs/parcel-notification-validation、outputs/parcel-share-validation、outputs/parcel-debug-validation。构建outputs/AndroidToolbox-0.6.13.apk及校验文件，未发布GitHub。
+- 限制：这是SDK模拟器证据，未验证荣耀PNM-AN10 Android17的系统后台策略、被隐藏的通知正文或分享菜单；不声称解决系统库不可见的历史5G消息批量扫描。

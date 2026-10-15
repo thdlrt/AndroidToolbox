@@ -9,7 +9,11 @@ abstract class ToolEntryActivity extends Activity {
     abstract String page();
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
-        Intent forwarded=new Intent(getIntent()).setClass(this,MainActivity.class).putExtra("page",page());
+        forward(getIntent());
+    }
+    @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);forward(intent);}
+    private void forward(Intent incoming){
+        Intent forwarded=new Intent(incoming).setClass(this,MainActivity.class).putExtra("page",page());
         // Keep ClipData, stream extras and grant flags on the receiving Activity.
         forwarded.setFlags((forwarded.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION))
                 | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NO_ANIMATION);
