@@ -173,4 +173,6 @@
 - 返回工具箱再进入不重新加载，页面与滚动位置保留；未配置时不显示刷新按钮，配置后显示地址副标题。
 - JVM 测试含 9 项 `PocketSettingsTest`（地址规范化、默认端口、非法路径/协议拒绝、登录表单编码、衍生 URL），`testDebugUnitTest` 通过。
 - 未验证：实体手机上的软键盘与输入法行为（模拟器无可用软键盘，仅确认聚焦后页面随输入上移）；DSH 页面自带桌面排版，手机宽度下的空白与控件大小由 DSH 自身决定，本工具只提供双指缩放。
-- 签名 APK：outputs/AndroidToolbox-0.7.0.apk，包名 net.lanbridge.android，版本 0.7.0/code25；13,997,924 字节，SHA-256 74a7b789434a75eb86445afb3efb429f8116bce92dff99844a2dff74c82ca4ba。未提交 Git、未发布 GitHub Release。
+- 签名 APK：outputs/AndroidToolbox-0.7.0.apk，包名 net.lanbridge.android，版本 0.7.0/code25；13,997,924 字节，SHA-256 74a7b789434a75eb86445afb3efb429f8116bce92dff99844a2dff74c82ca4ba。签名证书 SHA-256 f299b831be45343d8f2fb1b6f2c6557075946f93ab099fd1b4d746f1fd2501d7，与历史发行版一致，可覆盖安装。
+
+已发布 GitHub Release v0.7.0 并上传 AndroidToolbox-0.7.0.apk 与同名 .sha256。从发行地址重新下载后校验：大小 13,997,924 字节、SHA-256 与本地构建一致，apt2 读出包名 net.lanbridge.android、版本 0.7.0/code25，pksigner 证书指纹与历史一致；/releases/latest 返回 v0.7.0，客户端更新检查可直接发现。
