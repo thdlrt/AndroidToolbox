@@ -13,8 +13,8 @@ final class ToolUi {
     static final int INK=Color.rgb(29,43,65), MUTED=Color.rgb(100,116,139), BLUE=Color.rgb(56,108,244), BG=Color.rgb(245,247,251);
     static int dp(Context c,int n){return Math.round(n*c.getResources().getDisplayMetrics().density);}
     static LinearLayout column(Context c){LinearLayout l=new LinearLayout(c);l.setOrientation(1);return l;}
-    static String toolIcon(String id){switch(id){case "vpn":return "shield";case "relay":return "transfer";case "ledger":return "ledger";case "diagnostics":return "network";case "parcel":return "parcel";default:return id;}}
-    static int toolColor(String id){switch(id){case "vpn":return 0xff25816d;case "ledger":return 0xffb47724;case "diagnostics":return 0xff7254ba;case "parcel":return 0xffc66b44;default:return BLUE;}}
+    static String toolIcon(String id){switch(id){case "vpn":return "shield";case "relay":return "transfer";case "ledger":return "ledger";case "diagnostics":return "network";case "parcel":return "parcel";case "pocket":return "pocket";default:return id;}}
+    static int toolColor(String id){switch(id){case "vpn":return 0xff25816d;case "ledger":return 0xffb47724;case "diagnostics":return 0xff7254ba;case "parcel":return 0xffc66b44;case "pocket":return 0xff2f6f8f;default:return BLUE;}}
     static LinearLayout card(Context c){LinearLayout v=column(c);int p=dp(c,18);v.setPadding(p,p,p,p);GradientDrawable bg=box(c,Color.WHITE,20);bg.setStroke(dp(c,1),0xffe7ebf2);v.setBackground(bg);return v;}
     static LinearLayout header(Context c,String title,Runnable back){LinearLayout row=new LinearLayout(c);row.setGravity(Gravity.CENTER_VERTICAL);row.addView(iconButton(c,"back","返回",back));TextView t=text(c,title,23,INK);t.setTypeface(null,Typeface.BOLD);row.addView(t,new LinearLayout.LayoutParams(0,-2,1));row.setPadding(0,0,0,dp(c,16));return row;}
     static void space(LinearLayout parent,View child){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(parent.getContext(),12);parent.addView(child,p);}
@@ -91,7 +91,7 @@ final class ToolUi {
         private String selected;
         private boolean wide, bottomEnabled=true;
         private final java.util.Map<String,LinearLayout> rows=new java.util.LinkedHashMap<>();
-        private final String[][] items={{"home","首页","home"},{"relay","文件中转站","transfer"},{"vpn","回家 VPN","shield"},{"ledger","项目记账","ledger"},{"diagnostics","网络诊断","network"},{"parcel","取件助手","parcel"},{"tools","全部工具","grid"},{"settings","设置","settings"}};
+        private final String[][] items={{"home","首页","home"},{"relay","文件中转站","transfer"},{"vpn","回家 VPN","shield"},{"ledger","项目记账","ledger"},{"diagnostics","网络诊断","network"},{"parcel","取件助手","parcel"},{"pocket","手机访问","pocket"},{"tools","全部工具","grid"},{"settings","设置","settings"}};
         Shell(MainActivity a,View body,String selected){
             super(a);activity=a;this.selected=selected;setOrientation(HORIZONTAL);setBackgroundColor(BG);
             rail=column(a);rail.setTag("toolbox-navigation");rail.setPadding(dp(a,16),dp(a,24),dp(a,16),dp(a,20));rail.setBackgroundColor(0xffedf1f8);
@@ -129,6 +129,7 @@ final class ToolUi {
         private void line(Canvas c,float... points){Path p=new Path();p.moveTo(points[0],points[1]);for(int i=2;i<points.length;i+=2)p.lineTo(points[i],points[i+1]);c.drawPath(p,paint);}
         public void draw(Canvas c){c.save();Rect b=getBounds();c.translate(b.left,b.top);c.scale(b.width()/24f,b.height()/24f);switch(name){
             case "parcel":line(c,3,7,12,3,21,7,21,17,12,22,3,17,3,7,12,12,21,7);line(c,12,12,12,22);line(c,8,5,17,10,17,14);break;
+            case "pocket":c.drawRoundRect(3,4,21,16,2,2,paint);line(c,9,20,15,20,12,16,12,20);break;
             case "ledger":line(c,5,3,19,3,19,22,16,20,13,22,10,20,7,22,5,20,5,3);line(c,9,7,15,7);line(c,9,11,15,11);line(c,9,15,12,15);break;
             case "network":c.drawRoundRect(8,2,16,8,1,1,paint);line(c,12,8,12,12,4,12,4,16);line(c,12,12,20,12,20,16);c.drawRoundRect(1,16,7,22,1,1,paint);c.drawRoundRect(17,16,23,22,1,1,paint);break;
             case "transfer":line(c,3,7,20,7,16,3);line(c,20,7,16,11);line(c,21,17,4,17,8,13);line(c,4,17,8,21);break;

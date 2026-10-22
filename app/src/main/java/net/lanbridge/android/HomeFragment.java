@@ -48,7 +48,7 @@ public final class HomeFragment extends ToolFragment {
             LinearLayout c=ToolUi.card(context());c.setMinimumHeight(dp(144));c.setPadding(dp(16),dp(16),dp(16),dp(16));int color=ToolUi.toolColor(tool.id);
             ImageView icon=ToolUi.icon(context(),ToolUi.toolIcon(tool.id),color);icon.setPadding(dp(10),dp(10),dp(10),dp(10));icon.setBackground(ToolUi.box(context(),(color&0x00ffffff)|0x14000000,15));c.addView(icon,new LinearLayout.LayoutParams(dp(40),dp(40)));
             TextView name=text(tool.name,17);name.setTypeface(null,Typeface.BOLD);name.setPadding(0,dp(10),0,dp(6));c.addView(name);
-            String description;switch(tool.id){case "vpn":description="安全连接家中网络";break;case "relay":description="跨设备传递文件";break;case "ledger":description="项目收支 · 拍照记账";break;case "diagnostics":description="连接检测与问题排查";break;default:description="智能整理 · 轻松取件";}
+            String description;switch(tool.id){case "vpn":description="安全连接家中网络";break;case "relay":description="跨设备传递文件";break;case "ledger":description="项目收支 · 拍照记账";break;case "diagnostics":description="连接检测与问题排查";break;case "pocket":description="电脑 DSH · 手机打开";break;default:description="智能整理 · 轻松取件";}
             TextView detail=text(description,12);detail.setTextColor(ToolUi.MUTED);detail.setPadding(0,0,0,0);c.addView(detail);
             if(tool.id.equals("vpn")){vpnState=text("未连接",12);vpnState.setTextColor(color);vpnState.setPadding(0,dp(6),0,0);c.addView(vpnState);}
             ToolUi.ripple(c,Color.WHITE,20);c.setFocusable(true);c.setContentDescription("打开"+tool.name);c.setOnClickListener(v->startActivity(new Intent(context(),tool.activity)));

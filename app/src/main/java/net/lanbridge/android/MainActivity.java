@@ -20,6 +20,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         long completed=manager.lastSuccess;if(!manager.running&&manager.error.isEmpty()&&observedSync>=0&&completed>observedSync)Toast.makeText(MainActivity.this,"数据同步完成",Toast.LENGTH_SHORT).show();
         if(!manager.running)observedSync=completed;syncHandler.postDelayed(this,700);}};
     private String page = "home", connectionReturn = "settings", aiReturn = "settings";
+    private LinearLayout globalBar;
 
     static String pageFor(ComponentName component) {
         if (component == null) return null;
@@ -30,6 +31,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         if (name.equals(LedgerActivity.class.getName())) return "ledger";
         if (name.equals(DiagnosticsActivity.class.getName())) return "diagnostics";
         if (name.equals(ParcelActivity.class.getName())) return "parcel";
+        if (name.equals(PocketActivity.class.getName())) return "pocket";
         if (name.equals(AiSettingsActivity.class.getName())) return "ai-settings";
         return null;
     }
@@ -39,7 +41,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         try{ConfigBackupService.recoverPending(this);}catch(Exception e){Toast.makeText(this,"本机配置恢复未完成，请重试",Toast.LENGTH_LONG).show();}
         LinearLayout body = ToolUi.column(this);
-        LinearLayout globalBar=new LinearLayout(this);globalBar.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);globalBar.setPadding(ToolUi.dp(this,12),0,ToolUi.dp(this,12),0);
+        globalBar=new LinearLayout(this);globalBar.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);globalBar.setPadding(ToolUi.dp(this,12),0,ToolUi.dp(this,12),0);
         syncButton=ToolUi.iconButton(this,"refresh","同步数据",()->{if(!WebDavSettings.store(this).hasPassword()){show("webdav");return;}DataSyncManager.get(this).requestAll(DataSyncManager.Trigger.MANUAL);});syncButton.setTag("global-data-sync");syncButton.setOnLongClickListener(v->{new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle("数据同步").setMessage(DataSyncManager.get(this).summary()).setPositiveButton("关闭",null).show();return true;});globalBar.addView(syncButton);
         FrameLayout pane = new FrameLayout(this);
         pane.setId(CONTENT_ID);
@@ -59,7 +61,9 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
     }
     void show(String id) { show(id,true,null); }
     private void show(String id,boolean animate,Intent incoming) {
-        if (!java.util.Arrays.asList("home","tools","settings","relay","vpn","webdav","ledger","diagnostics","parcel","ai-settings").contains(id)) id="home";
+        if (!java.util.Arrays.asList("home","tools","settings","relay","vpn","webdav","ledger","diagnostics","parcel","pocket","ai-settings").contains(id)) id="home";
+        // The pocket page is a full-width web view: the shared sync bar would only steal height there.
+        if (globalBar != null) globalBar.setVisibility("pocket".equals(id) ? View.GONE : View.VISIBLE);
         FragmentManager manager = getFragmentManager();
         ToolFragment next = (ToolFragment)manager.findFragmentByTag(id);
         boolean changed = !page.equals(id);
@@ -78,7 +82,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         for (Fragment fragment : manager.getFragments())
             if (fragment != next && !fragment.isHidden()) transaction.hide(fragment);
         if (next == null) {
-            next = id.equals("parcel") ? new ParcelFragment() : id.equals("ai-settings") ? new AiSettingsFragment() : id.equals("ledger") ? new LedgerFragment() : id.equals("diagnostics") ? new DiagnosticsFragment() : id.equals("relay") ? new RelayFragment() : id.equals("vpn") ? new VpnFragment() : id.equals("webdav") ? new WebDavFragment() : new HomeFragment();
+            next = id.equals("parcel") ? new ParcelFragment() : id.equals("pocket") ? new PocketFragment() : id.equals("ai-settings") ? new AiSettingsFragment() : id.equals("ledger") ? new LedgerFragment() : id.equals("diagnostics") ? new DiagnosticsFragment() : id.equals("relay") ? new RelayFragment() : id.equals("vpn") ? new VpnFragment() : id.equals("webdav") ? new WebDavFragment() : new HomeFragment();
             Bundle arguments = new Bundle();arguments.putString("page",id);
             arguments.putParcelable("incoming",incoming == null ? new Intent() : new Intent(incoming));
             next.setArguments(arguments);

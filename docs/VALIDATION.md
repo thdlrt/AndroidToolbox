@@ -164,3 +164,13 @@
 - 9项分享验收通过：纯文字分享入口、应用关闭时启动、已打开时接收、无SMS权限、完整原文入库、空分享无请求、重建不重复。修复首次分享早于Fragment控件初始化，以及NEW_TASK复用入口时的转发；普通扫描23项回归通过。
 - 92项JVM测试通过，1项默认NAS测试跳过；签名构建及lintVital通过。测试回执在outputs/parcel-notification-validation、outputs/parcel-share-validation、outputs/parcel-debug-validation。构建outputs/AndroidToolbox-0.6.13.apk及校验文件，未发布GitHub。
 - 限制：这是SDK模拟器证据，未验证荣耀PNM-AN10 Android17的系统后台策略、被隐藏的通知正文或分享菜单；不声称解决系统库不可见的历史5G消息批量扫描。
+
+## 2026-10-22 · 0.7.0 手机访问电脑里的 DSH
+
+- 先在电脑上实测 DSH Pocket 的登录协议：`POST /pocket-login`（`username=dsh-pocket` 加 8 位 PIN）返回 302 与 `dsh_pocket_token` cookie；带 cookie 访问 `/` 只得到一次性握手页，再由页面自身完成后续跳转。据此确定自动登录必须提交真实表单，不能手写 cookie 或直接 `postUrl`。
+- 用系统 Chrome 在同一模拟器验证服务端本身可用：输入 PIN 后直接进入 DSH 界面，说明失败只来自 WebView 的跨站 cookie 策略，不是电脑端配置。
+- 应用内 WebView 改为「清空旧 cookie → 还原页面原表单字段 → 提交」后，在 `emulator-5554`（Android 16，1080x1920）用正式签名包完成端到端验证：新装 → 填 `192.168.100.110:3081` 与 PIN → 打开 → 自动登录进入 DSH 界面（项目 WinToolbox、模型 DeepSeek-V4.1-Flash）。修复前同一路径稳定停在 DSH 的「无法完成登录握手」页。
+- 返回工具箱再进入不重新加载，页面与滚动位置保留；未配置时不显示刷新按钮，配置后显示地址副标题。
+- JVM 测试含 9 项 `PocketSettingsTest`（地址规范化、默认端口、非法路径/协议拒绝、登录表单编码、衍生 URL），`testDebugUnitTest` 通过。
+- 未验证：实体手机上的软键盘与输入法行为（模拟器无可用软键盘，仅确认聚焦后页面随输入上移）；DSH 页面自带桌面排版，手机宽度下的空白与控件大小由 DSH 自身决定，本工具只提供双指缩放。
+- 签名 APK：outputs/AndroidToolbox-0.7.0.apk，包名 net.lanbridge.android，版本 0.7.0/code25；13,997,924 字节，SHA-256 74a7b789434a75eb86445afb3efb429f8116bce92dff99844a2dff74c82ca4ba。未提交 Git、未发布 GitHub Release。

@@ -15,6 +15,7 @@
 - `ConfigBackupService` / `ConfigBackupCodec`：手动 v2 加密配置备份；跨端只共享 AI，同端恢复平台偏好。预览状态校验避免并发覆盖，加密事务记录支持失败回滚与重启恢复。旧 Android/AI 文件兼容读取。
 - `RelayFragment` / `RelayService`：中转文件与本机缓存列表、系统文件 URI 授权、前台传输队列。销毁后的异步列表回调不得再更新界面。
 - `ToolEntryActivity`：保留已有 Relay/VPN/WebDAV Activity 名称作为兼容入口；转入 MainActivity 时复制 Intent、ClipData 和 URI 授权。应用内直接切换 Fragment，外部分享入口不变。
+- `PocketFragment` / `PocketSettings` / `PocketActivity`：在应用内 WebView 打开电脑上的 DSH 界面。地址只接受 http(s) 的主机与端口，密码用 `LoginStore` 加密保存；登录由真实表单自动提交完成，cookie 留在应用自身 WebView，因此不依赖系统浏览器是否接受纯 IP 的 http cookie。页面用 hide/show 复用，返回工具箱不重新加载。
 - `AppUpdater`：应用级后台下载任务；独立 HTTP 客户端，不携带 NAS Cookie。
 - `ReleaseInfo`：正式版语义版本比较、官方资产路径校验。
 - `UpdateProvider`：仅通过临时读取授权向安装器提供一个 APK。
