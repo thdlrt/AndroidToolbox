@@ -37,6 +37,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         if (name.equals(DiagnosticsActivity.class.getName())) return "diagnostics";
         if (name.equals(ParcelActivity.class.getName())) return "parcel";
         if (name.equals(PocketActivity.class.getName())) return "pocket";
+        if (name.equals(HapiActivity.class.getName())) return "hapi";
         if (name.equals(AiSettingsActivity.class.getName())) return "ai-settings";
         return null;
     }
@@ -62,16 +63,16 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
             connectionReturn = state.getString("connectionReturn","settings");
             aiReturn = state.getString("aiReturn","settings");
             show(page,false,null);
-            if (state.getBoolean("pocketFullscreen",false) && "pocket".equals(page) && PocketSettings.configured(this))
+            if (state.getBoolean("pocketFullscreen",false) && (("pocket".equals(page) && PocketSettings.configured(this)) || ("hapi".equals(page) && HapiSettings.configured(this))))
                 setPocketFullscreen(true);
         } else handleIntent(getIntent());
     }
     void show(String id) { show(id,true,null); }
     private void show(String id,boolean animate,Intent incoming) {
-        if (!java.util.Arrays.asList("home","tools","settings","relay","vpn","webdav","ledger","diagnostics","parcel","pocket","ai-settings").contains(id)) id="home";
-        if (pocketFullscreen && !"pocket".equals(id)) setPocketFullscreen(false);
+        if (!java.util.Arrays.asList("home","tools","settings","relay","vpn","webdav","ledger","diagnostics","parcel","pocket","hapi","ai-settings").contains(id)) id="home";
+        if (pocketFullscreen && !page.equals(id)) setPocketFullscreen(false);
         // The pocket page is a full-width web view: the shared sync bar would only steal height there.
-        if (globalBar != null) globalBar.setVisibility("pocket".equals(id) ? View.GONE : View.VISIBLE);
+        if (globalBar != null) globalBar.setVisibility(("pocket".equals(id)||"hapi".equals(id)) ? View.GONE : View.VISIBLE);
         FragmentManager manager = getFragmentManager();
         ToolFragment next = (ToolFragment)manager.findFragmentByTag(id);
         boolean changed = !page.equals(id);
@@ -90,7 +91,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         for (Fragment fragment : manager.getFragments())
             if (fragment != next && !fragment.isHidden()) transaction.hide(fragment);
         if (next == null) {
-            next = id.equals("parcel") ? new ParcelFragment() : id.equals("pocket") ? new PocketFragment() : id.equals("ai-settings") ? new AiSettingsFragment() : id.equals("ledger") ? new LedgerFragment() : id.equals("diagnostics") ? new DiagnosticsFragment() : id.equals("relay") ? new RelayFragment() : id.equals("vpn") ? new VpnFragment() : id.equals("webdav") ? new WebDavFragment() : new HomeFragment();
+            next = id.equals("parcel") ? new ParcelFragment() : id.equals("pocket") ? new PocketFragment() : id.equals("hapi") ? new HapiFragment() : id.equals("ai-settings") ? new AiSettingsFragment() : id.equals("ledger") ? new LedgerFragment() : id.equals("diagnostics") ? new DiagnosticsFragment() : id.equals("relay") ? new RelayFragment() : id.equals("vpn") ? new VpnFragment() : id.equals("webdav") ? new WebDavFragment() : new HomeFragment();
             Bundle arguments = new Bundle();arguments.putString("page",id);
             arguments.putParcelable("incoming",incoming == null ? new Intent() : new Intent(incoming));
             next.setArguments(arguments);
@@ -117,7 +118,8 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         pocketFullscreen=on;
         if(shell!=null)shell.fullscreen(on);
         applyFullscreenWindow(on);
-        ToolFragment active=(ToolFragment)getFragmentManager().findFragmentByTag("pocket");
+        ToolFragment active=(ToolFragment)getFragmentManager().findFragmentByTag(page);
+        if(active instanceof HapiFragment)((HapiFragment)active).applyFullscreenUi(on);
         if(active instanceof PocketFragment)((PocketFragment)active).applyFullscreenUi(on);
     }
     private void applyFullscreenWindow(boolean on){

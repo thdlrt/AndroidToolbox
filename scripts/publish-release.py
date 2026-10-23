@@ -1,5 +1,6 @@
 """Explicit maintainer command. Uses Git Credential Manager; never prints credentials."""
 import argparse
+import hashlib
 import json
 import pathlib
 import subprocess
@@ -15,6 +16,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('action', choices=['create-repo', 'release', 'verify'])
     parser.add_argument('--version', default='0.2.1')
+    parser.add_argument('--extra-asset', action='append', default=[])
     args = parser.parse_args()
     credentials = subprocess.run(['git', 'credential', 'fill'], input='protocol=https\nhost=github.com\n\n', text=True, capture_output=True, check=True)
     token = dict(line.split('=', 1) for line in credentials.stdout.splitlines() if '=' in line)['password']
@@ -42,11 +44,19 @@ def main():
         apk = ROOT / 'outputs' / ('AndroidToolbox-' + version + '.apk')
         checksum = apk.with_suffix('.apk.sha256')
         if not apk.is_file() or not checksum.is_file(): raise RuntimeError('Build the APK and checksum first')
+        if checksum.read_text(encoding='utf-8-sig').strip().split()[0] != hashlib.sha256(apk.read_bytes()).hexdigest():
+            raise RuntimeError('APK checksum does not match')
+        extra = [pathlib.Path(p).resolve() for p in args.extra_asset]
+        if any(p.parent != (ROOT / 'outputs').resolve() or not p.is_file() for p in extra):
+            raise RuntimeError('Extra release assets must be existing files directly in outputs/')
         notes = (ROOT / 'docs' / ('RELEASE-' + version + '.md')).read_text(encoding='utf-8')
         release = api('/repos/' + REPO + '/releases', {'tag_name': 'v' + version, 'name': '安卓工具箱 ' + version, 'body': notes, 'draft': True, 'prerelease': False})
-        for path in (apk, checksum):
+        for path in (apk, checksum, *extra):
             url = release['upload_url'].split('{')[0] + '?name=' + urllib.parse.quote(path.name)
             uploaded = api(url, path.read_bytes(), binary=True)
+            expected = hashlib.sha256(path.read_bytes()).hexdigest()
+            if uploaded.get('size') != path.stat().st_size or uploaded.get('digest') != 'sha256:' + expected:
+                raise RuntimeError('Uploaded asset failed size/SHA-256 verification; release remains draft: ' + path.name)
             print('Uploaded:', uploaded['name'], uploaded['size'])
         published = api('/repos/' + REPO + '/releases/' + str(release['id']), {'draft': False}, method='PATCH')
         print(published['html_url'])

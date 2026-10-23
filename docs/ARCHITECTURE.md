@@ -37,3 +37,5 @@ SHA-256 提供传输完整性，发布方身份最终由 APK 签名约束。签�
 首版仅实现回家 VPN，仍是 IPv4 TCP 转发；普通 UDP、QUIC、ICMP、IPv6 不支持。工具箱迁移不声称解决 FN Connect 中继链路性能上限。
 
 - `AndroidConfigBackup` / `ConfigBackupService`：明确的配置白名单；手动上传和确认后恢复，不触及记账或附件。恢复前保存本机配置副本，WebDAV 连接/根目录与密码不会被恢复覆盖。
+
+- `HapiFragment` / `HapiSettings` / `HapiConnection`：独立 HAPI WebView，令牌只注入精确同源的 HAPI 本地存储；凭据用独立 LoginStore/Keystore，地址不含令牌，跨源链接交给系统浏览器。共用原有远程页面全屏窗口，保留 DSH 入口。

@@ -186,3 +186,16 @@
 - 签名 APK：outputs/AndroidToolbox-0.7.0.apk，包名 net.lanbridge.android，版本 0.7.0/code25；13,997,924 字节，SHA-256 74a7b789434a75eb86445afb3efb429f8116bce92dff99844a2dff74c82ca4ba。签名证书 SHA-256 f299b831be45343d8f2fb1b6f2c6557075946f93ab099fd1b4d746f1fd2501d7，与历史发行版一致，可覆盖安装。
 
 已发布 GitHub Release v0.7.0 并上传 AndroidToolbox-0.7.0.apk 与同名 .sha256。从发行地址重新下载后校验：大小 13,997,924 字节、SHA-256 与本地构建一致，apt2 读出包名 net.lanbridge.android、版本 0.7.0/code25，pksigner 证书指纹与历史一致；/releases/latest 返回 v0.7.0，客户端更新检查可直接发现。
+
+
+## 0.9.0 HAPI Codex 远程（2026-10-23）
+
+- 基于已发布 0.8.0 的独立工作树；主工作区尚未提交的记账 AI 等修改未纳入。版本代码29，包名net.lanbridge.android。
+- 109项JVM测试，0失败、1项既有NAS实机测试默认跳过；新增5项HapiConnection校验测试。
+- 真实Windows HAPI 0.30.7 hub/runner + 官方Codex 0.164.0，隔离CODEX_HOME与模拟Responses服务，验证会话创建、消息、request_user_input、回答回传和原生线程历史。
+- 安卓15模拟器emulator-5554通过16项检查，含真实HAPI网页登录/历史、原生系统文件选择器回传content URI、令牌和URL隔离、工具切换页面保留、全屏、折叠尺寸变化和返回。
+- 本机实际provider模型gpt-6.1-sol返回“连接正常”；没有修改用户Codex配置文件。
+- Windows部署脚本Install/Start/Stop/Status通过；hub父链为powershell -> WmiPrvSE，runner在启动终端退出后继续运行。
+- APK签名v2有效，证书SHA-256 f299b831be45343d8f2fb1b6f2c6557075946f93ab099fd1b4d746f1fd2501d7，与既有发行签名一致。
+- 完整lint有19项既有错误，逐行对照基线源码均存在，本次无新增lint错误；没有扩展修改这些旧问题。
+- 实体手机、外网系统VPN/Tailscale、网页语音未验收。HAPI管理的会话不等于接管官方桌面App任意活跃聊天。

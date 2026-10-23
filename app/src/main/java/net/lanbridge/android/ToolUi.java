@@ -13,7 +13,7 @@ final class ToolUi {
     static final int INK=Color.rgb(29,43,65), MUTED=Color.rgb(100,116,139), BLUE=Color.rgb(56,108,244), BG=Color.rgb(245,247,251);
     static int dp(Context c,int n){return Math.round(n*c.getResources().getDisplayMetrics().density);}
     static LinearLayout column(Context c){LinearLayout l=new LinearLayout(c);l.setOrientation(1);return l;}
-    static String toolIcon(String id){switch(id){case "vpn":return "shield";case "relay":return "transfer";case "ledger":return "ledger";case "diagnostics":return "network";case "parcel":return "parcel";case "pocket":return "pocket";default:return id;}}
+    static String toolIcon(String id){switch(id){case "vpn":return "shield";case "relay":return "transfer";case "ledger":return "ledger";case "diagnostics":return "network";case "parcel":return "parcel";case "pocket":case "hapi":return "pocket";default:return id;}}
     static int toolColor(String id){switch(id){case "vpn":return 0xff25816d;case "ledger":return 0xffb47724;case "diagnostics":return 0xff7254ba;case "parcel":return 0xffc66b44;case "pocket":return 0xff2f6f8f;default:return BLUE;}}
     static LinearLayout card(Context c){LinearLayout v=column(c);int p=dp(c,18);v.setPadding(p,p,p,p);GradientDrawable bg=box(c,Color.WHITE,20);bg.setStroke(dp(c,1),0xffe7ebf2);v.setBackground(bg);return v;}
     static LinearLayout header(Context c,String title,Runnable back){LinearLayout row=new LinearLayout(c);row.setGravity(Gravity.CENTER_VERTICAL);row.addView(iconButton(c,"back","返回",back));TextView t=text(c,title,23,INK);t.setTypeface(null,Typeface.BOLD);row.addView(t,new LinearLayout.LayoutParams(0,-2,1));row.setPadding(0,0,0,dp(c,16));return row;}
@@ -91,7 +91,7 @@ final class ToolUi {
         private String selected;
         private boolean wide, bottomEnabled=true, fullscreen;
         private final java.util.Map<String,LinearLayout> rows=new java.util.LinkedHashMap<>();
-        private final String[][] items={{"home","首页","home"},{"relay","文件中转站","transfer"},{"vpn","回家 VPN","shield"},{"ledger","项目记账","ledger"},{"diagnostics","网络诊断","network"},{"parcel","取件助手","parcel"},{"pocket","手机访问","pocket"},{"tools","全部工具","grid"},{"settings","设置","settings"}};
+        private final String[][] items={{"home","首页","home"},{"relay","文件中转站","transfer"},{"vpn","回家 VPN","shield"},{"ledger","项目记账","ledger"},{"diagnostics","网络诊断","network"},{"parcel","取件助手","parcel"},{"pocket","手机访问","pocket"},{"hapi","Codex 远程","pocket"},{"tools","全部工具","grid"},{"settings","设置","settings"}};
         Shell(MainActivity a,View body,String selected){
             super(a);activity=a;this.selected=selected;setOrientation(HORIZONTAL);setBackgroundColor(BG);
             rail=column(a);rail.setTag("toolbox-navigation");rail.setPadding(dp(a,16),dp(a,24),dp(a,16),dp(a,20));rail.setBackgroundColor(0xffedf1f8);
