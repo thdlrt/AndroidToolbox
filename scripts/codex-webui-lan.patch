@@ -1,0 +1,102 @@
+diff --git a/public/app.js b/public/app.js
+index 8011203..bd64050 100644
+--- a/public/app.js
++++ b/public/app.js
+@@ -1,4 +1,5 @@
+ import { currentLocale, initI18n, t } from "./i18n.js";
++import { createClientId } from "./client-id.js";
+ import { authenticatedUrl, authenticationAccepted, webSocketUrl } from "./access-auth.js";
+ import { isWebUserApproval } from "./approval-policy.js";
+ import {
+@@ -1171,14 +1172,6 @@ function parseJson(text) {
+   }
+ }
+ 
+-function createClientId() {
+-  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+-  const random = window.crypto?.getRandomValues
+-    ? Array.from(window.crypto.getRandomValues(new Uint32Array(2)), (value) => value.toString(36)).join("")
+-    : Math.random().toString(36).slice(2);
+-  return `${Date.now().toString(36)}-${random}`;
+-}
+-
+ function isImageFile(file) {
+   return Boolean(imageMimeForFile(file));
+ }
+@@ -2336,6 +2329,7 @@ async function sendTurn(text, { queue = false, expectedActiveTurnId = null } = {
+       throw new Error(t("error.followUpTurnEnded"));
+     }
+ 
++    const clientUserMessageId = createClientId();
+     state.followLiveOutput = true;
+     els.promptInput.value = "";
+     resizePromptInput();
+@@ -2344,7 +2338,6 @@ async function sendTurn(text, { queue = false, expectedActiveTurnId = null } = {
+     revokeImagePreviews(images);
+     state.lastMessageAt = currentUnixSeconds();
+     const queued = Boolean(queue && activeTurnId);
+-    const clientUserMessageId = crypto.randomUUID();
+     if (!activeTurnId) startReplyProgress(threadId);
+     const automationHeartbeat = parseAutomationHeartbeat(text);
+     if (!queued) {
+diff --git a/public/client-id.js b/public/client-id.js
+new file mode 100644
+index 0000000..9c89a27
+--- /dev/null
++++ b/public/client-id.js
+@@ -0,0 +1,10 @@
++// randomUUID is restricted to secure contexts; LAN HTTP still has getRandomValues.
++export function createClientId(cryptoApi = globalThis.crypto) {
++  if (cryptoApi?.randomUUID) return cryptoApi.randomUUID();
++  if (!cryptoApi?.getRandomValues) throw new Error("This browser does not support secure message IDs.");
++  const bytes = cryptoApi.getRandomValues(new Uint8Array(16));
++  bytes[6] = (bytes[6] & 0x0f) | 0x40;
++  bytes[8] = (bytes[8] & 0x3f) | 0x80;
++  const hex = Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("");
++  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
++}
+diff --git a/public/styles.css b/public/styles.css
+index 6f90e91..1bfb728 100644
+--- a/public/styles.css
++++ b/public/styles.css
+@@ -1071,6 +1071,19 @@ button {
+   max-width: 100%;
+   overflow-x: auto;
+   border-collapse: collapse;
++  margin-bottom: 12px;
++}
++
++.bubble.markdown th,
++.bubble.markdown td {
++  border: 1px solid var(--line);
++  padding: 7px 10px;
++  text-align: left;
++  white-space: nowrap;
++}
++
++.bubble.markdown th {
++  background: var(--surface);
+ }
+ 
+ .bubble.markdown blockquote {
+diff --git a/test/client-id.test.js b/test/client-id.test.js
+new file mode 100644
+index 0000000..a0dbca0
+--- /dev/null
++++ b/test/client-id.test.js
+@@ -0,0 +1,15 @@
++import assert from "node:assert/strict";
++import { webcrypto } from "node:crypto";
++import test from "node:test";
++import { createClientId } from "../public/client-id.js";
++
++test("LAN HTTP generates valid distinct message UUIDs without randomUUID", () => {
++  const insecureCrypto = { getRandomValues: bytes => webcrypto.getRandomValues(bytes) };
++  const ids = new Set(Array.from({ length: 100 }, () => createClientId(insecureCrypto)));
++  assert.equal(ids.size, 100);
++  for (const id of ids) assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
++});
++
++test("secure contexts retain native UUID generation", () => {
++  assert.equal(createClientId({ randomUUID: () => "native-id" }), "native-id");
++});

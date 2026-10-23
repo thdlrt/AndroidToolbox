@@ -12,7 +12,7 @@ import android.widget.*;
 import androidx.appcompat.app.AlertDialog;
 import org.json.JSONObject;
 
-/** Live Desktop first; HAPI remains available for its independently managed sessions. */
+/** The upstream Codex WebUI is embedded unchanged; HAPI keeps its own login. */
 public final class HapiFragment extends ToolFragment {
     private static final int PICK=6421;
     private FrameLayout stage;
@@ -24,7 +24,7 @@ public final class HapiFragment extends ToolFragment {
     private TextView host;
     private String origin="", token="";
     private boolean installed;
-    private boolean desktop=true;
+    private boolean legacy;
     private String browserOrigin="";
     private ValueCallback<Uri[]> picker;
 
@@ -38,7 +38,7 @@ public final class HapiFragment extends ToolFragment {
         host=ToolUi.text(context(),"",11,ToolUi.MUTED);words.addView(host);
         header.addView(words,new LinearLayout.LayoutParams(0,-2,1));
         header.addView(ToolUi.iconButton(context(),"refresh","重新加载",()->{if(web!=null)web.reload();}));
-        header.addView(ToolUi.iconButton(context(),"expand","全屏查看",()->{if(HapiSettings.configured(context()))((MainActivity)context()).setPocketFullscreen(true);}));
+        header.addView(ToolUi.iconButton(context(),"expand","全屏查看",()->{if(configured())((MainActivity)context()).setPocketFullscreen(true);}));
         header.addView(ToolUi.iconButton(context(),"settings","连接设置",this::editSettings));root.addView(header);
         tabs=new LinearLayout(context());root.addView(tabs);renderTabs();
         progress=new ProgressBar(context(),null,android.R.attr.progressBarStyleHorizontal);progress.setVisibility(View.GONE);root.addView(progress,new LinearLayout.LayoutParams(-1,dp(2)));
@@ -56,37 +56,37 @@ public final class HapiFragment extends ToolFragment {
         render();applyFullscreenUi(((MainActivity)context()).pocketFullscreen());return page;
     }
     private void render(){
-        origin=HapiSettings.origin(context());token=HapiSettings.token(context());host.setText(PocketSettings.display(origin));host.setVisibility(origin.isEmpty()?View.GONE:View.VISIBLE);
+        origin=legacy?HapiSettings.origin(context()):CodexWebSettings.origin(context());token=legacy?HapiSettings.token(context()):CodexWebSettings.token(context());host.setText(PocketSettings.display(origin));host.setVisibility(origin.isEmpty()?View.GONE:View.VISIBLE);
         stage.removeAllViews();
-        if(HapiSettings.configured(context()))ensureBrowser();else stage.addView(form(false));
+        if(configured())ensureBrowser();else stage.addView(form(false));
     }
+    private boolean configured(){return legacy?HapiSettings.configured(context()):CodexWebSettings.configured(context());}
     private View form(boolean dialog){
         ScrollView scroll=new ScrollView(context());LinearLayout body=ToolUi.column(context());body.setPadding(dp(20),dp(4),dp(20),dp(24));
-        EditText address=ToolUi.field(context(),body,"电脑地址",origin,false);address.setHint("192.168.1.10:3006");
+        EditText address=ToolUi.field(context(),body,"电脑地址",origin,false);address.setHint(legacy?"192.168.1.10:3006":"192.168.1.10:9526 或完整连接链接");
         EditText secret=ToolUi.field(context(),body,"访问令牌","",true);secret.setHint(token.isEmpty()?"电脑服务的访问令牌":"已保存，同一地址留空保持");
         TextView error=ToolUi.text(context(),"",12,0xffc0392b);body.addView(error);
         body.addView(ToolUi.button(context(),dialog?"保存并连接":"连接",true,()->{
-            try{HapiSettings.save(context(),address.getText().toString(),secret.getText().toString());destroyBrowser();if(settingsDialog!=null)settingsDialog.dismiss();render();}
+            try{if(legacy)HapiSettings.save(context(),address.getText().toString(),secret.getText().toString());else CodexWebSettings.save(context(),address.getText().toString(),secret.getText().toString());destroyBrowser();if(settingsDialog!=null)settingsDialog.dismiss();render();}
             catch(Exception e){error.setText(e.getMessage());}
         }));
         if(dialog)body.addView(ToolUi.button(context(),"清除登录",false,()->{
             WebStorage.getInstance().deleteOrigin(origin);
-            try{WebStorage.getInstance().deleteOrigin(HapiConnection.desktopOrigin(origin));}catch(Exception ignored){}
-            HapiSettings.clear(context());destroyBrowser();settingsDialog.dismiss();((MainActivity)context()).setPocketFullscreen(false);render();
+            if(legacy)HapiSettings.clear(context());else CodexWebSettings.clear(context());destroyBrowser();settingsDialog.dismiss();((MainActivity)context()).setPocketFullscreen(false);render();
         }));
-        TextView hint=ToolUi.text(context(),"电脑先更新并启动 codex-remote.ps1，保持桌面 Codex 打开。填写原 HAPI 地址（默认 3006）；实时会话使用下一端口（3007），令牌相同。使用局域网或其他系统 VPN / Tailscale。",12,ToolUi.MUTED);hint.setPadding(0,dp(12),0,0);body.addView(hint);
+        TextView hint=ToolUi.text(context(),legacy?"HAPI 使用独立服务与令牌。桌面正在运行的会话请切换到 Codex WebUI。":"电脑安装并启用 Codex WebUI 桌面桥接后，填写其地址（默认 9526）和访问令牌。与桌面共用会话，支持流式输出、引导和队列。使用局域网或已连接的 VPN。",12,ToolUi.MUTED);hint.setPadding(0,dp(12),0,0);body.addView(hint);
         scroll.addView(body);return scroll;
     }
     private AlertDialog settingsDialog;
     private void renderTabs(){
         tabs.removeAllViews();
-        tabs.addView(RemoteUi.tabs(context(),"hapi",desktop?"HAPI":"实时会话",()->{desktop=!desktop;destroyBrowser();renderTabs();render();}),new LinearLayout.LayoutParams(-1,-2));
+        tabs.addView(RemoteUi.tabs(context(),"hapi",legacy?"Codex WebUI":"HAPI",()->{legacy=!legacy;destroyBrowser();renderTabs();render();}),new LinearLayout.LayoutParams(-1,-2));
     }
     private void editSettings(){settingsDialog=new com.google.android.material.dialog.MaterialAlertDialogBuilder(context()).setTitle("连接设置").setView(form(true)).setNegativeButton("取消",null).create();settingsDialog.show();}
     @SuppressLint("SetJavaScriptEnabled") private void ensureBrowser(){
         if(web==null){
-            try{browserOrigin=desktop?HapiConnection.desktopOrigin(origin):origin;}catch(Exception e){failure(e.getMessage());return;}
-            host.setText(PocketSettings.display(browserOrigin)+(desktop?" · 桌面实时":" · HAPI"));
+            browserOrigin=origin;
+            host.setText(PocketSettings.display(browserOrigin)+(legacy?" · HAPI":" · Codex WebUI"));
             installed=false;web=new WebView(context());WebSettings s=web.getSettings();s.setJavaScriptEnabled(true);s.setDomStorageEnabled(true);s.setDatabaseEnabled(true);s.setAllowFileAccess(false);s.setAllowContentAccess(true);s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);s.setSupportZoom(true);s.setBuiltInZoomControls(true);s.setDisplayZoomControls(false);
             web.setWebChromeClient(new WebChromeClient(){
                 @Override public void onProgressChanged(WebView v,int n){progress.setProgress(n);progress.setVisibility(n<100?View.VISIBLE:View.GONE);}
@@ -108,10 +108,10 @@ public final class HapiFragment extends ToolFragment {
                     if(!HapiConnection.sameOrigin(browserOrigin,url)||installed)return;
                     installed=true;
                     // Set the hub's own auth store, then reload once. Never put the token in a URL.
-                    String script=desktop?"(function(){var k='codex_desktop_token',t="+JSONObject.quote(token)+";if(localStorage.getItem(k)!==t){localStorage.setItem(k,t);location.reload();}})()":"(function(){var k='hapi_access_token::'+location.origin,t="+JSONObject.quote(token)+";localStorage.removeItem('hapi_hub_url');localStorage.setItem('hapi-lang','zh-CN');if(localStorage.getItem(k)!==t){localStorage.setItem(k,t);location.reload();}})()";
+                    String script=!legacy?"(function(){var k='codex-webui-access-token',t="+JSONObject.quote(token)+";if(localStorage.getItem(k)!==t){localStorage.setItem(k,t);location.reload();}})()":"(function(){var k='hapi_access_token::'+location.origin,t="+JSONObject.quote(token)+";localStorage.removeItem('hapi_hub_url');localStorage.setItem('hapi-lang','zh-CN');if(localStorage.getItem(k)!==t){localStorage.setItem(k,t);location.reload();}})()";
                     v.evaluateJavascript(script,null);
                 }
-                @Override public void onReceivedError(WebView v,WebResourceRequest r,WebResourceError e){if(r.isForMainFrame())failure(desktop?"连不上实时会话服务。请更新电脑端 codex-remote.ps1 与 codex-desktop.mjs，再运行 Start；允许原端口的下一端口访问。也可点 HAPI 使用原网页。":"连不上 HAPI，请检查电脑服务、地址和局域网 / VPN。点击右上角刷新可重试。");}
+                @Override public void onReceivedError(WebView v,WebResourceRequest r,WebResourceError e){if(r.isForMainFrame())failure(legacy?"连不上 HAPI，请检查电脑服务、地址和局域网 / VPN。点击右上角刷新可重试。":"连不上 Codex WebUI。请确认电脑桌面桥接已启用，服务端口（默认 9526）允许访问，手机与电脑网络互通。点击刷新重试。");}
                 @Override public void onReceivedHttpError(WebView v,WebResourceRequest r,WebResourceResponse e){if(r.isForMainFrame())failure("电脑服务返回 HTTP "+e.getStatusCode()+"，请检查服务地址。");}
             });
             web.loadUrl(browserOrigin+"/");

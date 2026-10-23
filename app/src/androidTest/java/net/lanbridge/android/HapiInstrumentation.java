@@ -32,8 +32,8 @@ public final class HapiInstrumentation extends Instrumentation {
         check(origin!=null&&origin.startsWith("http://10.0.2.2:"),"Only the emulator fixture is allowed");
         activity=(MainActivity)startActivitySync(new Intent(getTargetContext(),MainActivity.class).putExtra("page","hapi").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));
         main(()->{HapiSettings.clear(activity);activity.show("home");activity.getFragmentManager().beginTransaction().remove(activity.getFragmentManager().findFragmentByTag("hapi")).commitNow();activity.show("hapi");});
-        main(()->{View page=activity.getFragmentManager().findFragmentByTag("hapi").getView();((EditText)find(page,"电脑地址")).setText(origin);((EditText)find(page,"访问令牌")).setText(token);find(page,"连接").performClick();check(HapiSettings.origin(activity).equals(origin),"Saved origin differs");check(HapiSettings.token(activity).equals(token),"Encrypted credential failed");});
         main(()->find(activity.getFragmentManager().findFragmentByTag("hapi").getView(),"HAPI").performClick());
+        main(()->{View page=activity.getFragmentManager().findFragmentByTag("hapi").getView();((EditText)find(page,"电脑地址")).setText(origin);((EditText)find(page,"访问令牌")).setText(token);find(page,"连接").performClick();check(HapiSettings.origin(activity).equals(origin),"Saved origin differs");check(HapiSettings.token(activity).equals(token),"Encrypted credential failed");});
         WebView[] web={null};main(()->web[0]=browser(activity.getFragmentManager().findFragmentByTag("hapi").getView()));check(web[0]!=null,"No WebView");
         long end=SystemClock.elapsedRealtime()+30000;String text="";
         while(SystemClock.elapsedRealtime()<end){text=js(web[0],"document.body.innerText");if(text.contains("workspace"))break;SystemClock.sleep(300);}

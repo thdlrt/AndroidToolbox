@@ -1,89 +1,64 @@
-# Codex 远程（实时桌面 / HAPI）
+# Codex 远程（Codex WebUI）
 
-安卓工具箱的「手机访问」在同一个入口切换 Codex / DSH，各自保留登录和页面。0.9.2 起 Codex 默认直接显示电脑桌面会话与运行状态，无需搜索或导入；点开后自动更新输出，可向同一桌面会话发消息。顶部 HAPI 切换至原网页，用于它独立管理的会话。
+0.9.3 的「手机访问 → Codex」嵌入 [DusuWorks/codex-webui](https://github.com/DusuWorks/codex-webui)。网页与 Windows Codex Desktop 共用一个 app-server：桌面发起的会话、实时输出、引导和队列都走同一运行时。DSH 仍在同一个入口；HAPI 使用独立连接和凭据，保留用于它自己管理的会话。
 
-## Windows 电脑
+## Windows 安装
 
-从本次 Release 同时下载 `codex-remote.ps1` 和 `codex-desktop.mjs`，放在同一目录，需要已有 Node.js/npm，以及已登录的 Codex 账号或已配置的 provider。脚本安装独立的 HAPI 0.30.7 和 Codex CLI 0.164.0，不替换桌面应用、不改用户的 Codex 配置文件。
-
-在 PowerShell 执行，按实际位置修改路径：
+需要 Node.js 20+、Git、PowerShell 7，以及已经登录或配置好 provider 的 Codex Desktop。无需额外 OpenAI API Key。下载 Release 中的 `setup-codex-webui.ps1` 和 `codex-webui-lan.patch`，放在同一目录：
 
 ```powershell
-& .\codex-remote.ps1 -Action Install -Root E:\Tools\CodexRemote -AllDrives -ListenHost 0.0.0.0
-& .\codex-remote.ps1 -Action Start -Root E:\Tools\CodexRemote
-& .\codex-remote.ps1 -Action Info -Root E:\Tools\CodexRemote
+pwsh -File .\setup-codex-webui.ps1 -Action Install -Root E:\Tools\CodexWebUI
 ```
 
-`Install` 是明确的软件下载动作，使用大陆 npm 镜像并由 npm 校验完整性；镜像不可用时可按错误提示使用官方源。`AllDrives` 在 runner 启动时列出当前 Windows 账号可访问的已挂载磁盘，包括可用的映射盘；新安装未指定目录时也采用此模式。可选 `-WorkspaceRoot C:\work,E:\code` 限定一个或多个目录。Codex 文件和命令权限仍由会话自身设置决定，浏览范围不是操作系统沙箱。
+安装固定上游提交 `269d797196edfd1db134d12c4dda2d9f716cc1db`，应用局域网 HTTP 兼容修复并运行测试，然后安装桌面启动器。重复安装会保留令牌、上传文件和日志；有冲突的本地源码改动会明确报错。源码位置是 `-Root`，运行数据默认在 `%LOCALAPPDATA%\CodexWebUI`。安装不会替你在 Codex 侧栏登记项目。
 
-从 0.9.0 / 0.9.1 升级电脑脚本时，保留原安装目录的 data；无需重复安装 npm 包：
+准备好重启 Codex Desktop 时执行：
 
 ```powershell
-& .\codex-remote.ps1 -Action Configure -Root E:\Tools\CodexRemote -AllDrives
-& .\codex-remote.ps1 -Action Start -Root E:\Tools\CodexRemote
+pwsh -File .\setup-codex-webui.ps1 -Action Enable -Root E:\Tools\CodexWebUI
 ```
 
-Configure 保留端口、监听地址、凭据和会话库；Start 刷新 runner 的磁盘范围，已有 hub 持续运行。普通用户无权读取的目录仍由 Windows 拒绝访问。
-
-`Info` 只在电脑本地显示访问令牌。不要把令牌发到群聊、问题单或日志。HAPI 默认端口 3006，实时桌面端口为 3007（原端口加一），共用原令牌；安卓端仍填写原地址，自动连接下一端口。两个端口均需可达。使用 HTTPS 时需要在下一端口提供对应 HTTPS 反向代理；目前不支持单域名路径代理。安卓端填写电脑可达 IP，例如 `http://192.168.1.10:3006`，不要填写 `127.0.0.1`。首次连接若被 Windows 防火墙拦截，仅允许受信任的专用网络访问；不要把这个服务端口直接转发到公网。
-
-默认不启用公共 relay、远程推送或开机自启。`Start` 启动 HAPI hub、runner 和桌面 companion；更新 companion 只重启本服务，不重启桌面 Codex 或已有 HAPI hub。服务使用 Windows WMI 从独立进程启动，关闭启动终端或 Codex 聊天不会关闭服务。
+此操作将用户级 `CODEX_CLI_PATH` 指向桌面桥接启动器并保存原值。**完全退出再重新打开 Codex Desktop** 后生效；脚本不会主动退出应用。新启动器让桌面和网页共用真正的 app-server，不修改 AppX 文件或用户 Codex 配置，也不另开引擎抢占正在运行的会话。桌面启动后自动启动一份网页服务，默认端口 9526；保持桌面应用运行。
 
 ```powershell
-& .\codex-remote.ps1 -Action Status -Root E:\Tools\CodexRemote
-& .\codex-remote.ps1 -Action Stop -Root E:\Tools\CodexRemote
+pwsh -File .\setup-codex-webui.ps1 -Action Status -Root E:\Tools\CodexWebUI
+pwsh -File .\setup-codex-webui.ps1 -Action QR -Root E:\Tools\CodexWebUI
 ```
 
-配置、令牌、日志和 HAPI 会话库在安装目录的 `data`，目录权限只授予本机当前账号和 SYSTEM。卸载或更新前自行保留该目录。脚本重复 Install 会保留已有令牌与会话，但会更新连接参数；已有服务应先 Stop 再更新。
+QR 命令在电脑本地显示私有连接链接和二维码。链接含令牌，不要贴进群聊或问题单。普通 Windows 防火墙提示只允许受信任网络；手机需要能访问电脑的 9526 端口。同一局域网直连，外出使用已有系统 VPN/Tailscale 或自行配置的 HTTPS 私有入口。工具箱自带回家 VPN 排除工具箱自身。
 
-## 安卓
+## 安卓使用
 
-1. 打开「全部工具 → 手机访问 → Codex」。下次打开会记住选择；顶部可随时切换 DSH。
-2. 填入电脑地址和 `Info` 显示的访问令牌，点「连接」。也可粘贴 HAPI 的 `?token=` 链接，应用会分离令牌，网页地址不携带令牌。
-3. 默认直接列出桌面最近 50 个会话及置顶，运行中与待处理排在前面。直接点会话查看当前消息与工具输出，3 秒自动更新；筛选和搜索均可选。窄屏返回列表后可选择其他会话，宽屏左右两栏。
-4. 输入消息并发送，会经桌面原有连接到达同一会话；不会另建 app-server 或导入副本。活跃会话如何处理后续输入由桌面决定。发送失败或超时需先检查会话；不会自动重发。
-5. 需要创建独立 HAPI 会话时点顶部 HAPI，选择电脑与目录；其提问、审批、停止和附件沿用 HAPI 自己的功能。点「实时会话」回到桌面列表。
+1. 打开「全部工具 → 手机访问 → Codex」。
+2. 填写 WebUI 地址，例如 `http://192.168.1.10:9526` 和访问令牌；也可粘贴带 `?token=` 或 `#token=` 的完整连接链接。应用分离令牌后加载原地址，不再自动增加端口。
+3. 直接从会话侧栏选择桌面会话，活跃状态会同步更新。消息实时流入，支持 Markdown 标题、列表、表格和代码块；向上阅读时不强制拖回底部。
+4. 回复进行中点击发送，可选择「立即引导」「加入队列」或「停止当前回复」。引导针对当前 turn；队列由共享运行时保存并接续执行。
+5. 输入栏齿轮展开模型、推理强度、权限设置。模型和强度写入共享会话，活跃轮次期间的变更用于后续轮次；实际可选项以本机 provider 返回为准。
+6. 新会话可浏览当前 Windows 账号可访问的磁盘与目录。默认令牌不限定单个工作区；无权访问的目录仍会报错。
 
-右上角提供刷新、全屏和连接设置。返回键先退出全屏，再按网页历史返回；切换工具保留 WebView。附件使用安卓系统文件选择器。没有额外的麦克风、相机或文件全盘访问权限；网页语音录制未接入。
+顶部可切换 DSH、HAPI、全屏和连接设置。DSH、Codex WebUI、HAPI 的凭据分开保存；旧 HAPI 地址和令牌不会自动用于新服务。网页图片上传使用系统文件选择器。没有接入网页语音录制。
 
-访问令牌通过独立的 Android Keystore 存储；HAPI 自身网页登录数据保存在应用私有 WebView 存储。换服务器时不复用旧令牌；「清除登录」清除本入口的凭据和对应服务网页存储，不清除 DSH 的 cookie。
-
-## 范围
-
-- 实时桌面使用已安装 Codex Desktop 的 app-tools 连接；必须保持桌面应用打开，至少打开一个已有会话。可显示该接口返回的本机／远程 Codex 最近会话，归档列表不在本版范围。该接口按轮次提供消息快照，长轮次显示最近 100 项工具／消息，可加载更早轮次；并非逐 token 推流，超长工具输出有截断标志。
-- 桌面接口目前没有停止、审批、原生交互选项答复能力，这些操作需在电脑端处理；可输入补充文字继续同一会话，但不等于回答待审批请求。HAPI 功能只适用于 HAPI 自己管理的运行时。
-- Companion 只提供会话列表、读取和发送三类受令牌保护的接口，不代理任意 MCP 调用；不修改用户 Codex 配置，不读取 provider 密钥。安装目录内的 Node 服务使用本机已有桌面 app-tools，桌面版本变化可能使接口不可用。
-- 同一局域网可直连；外出可用其他系统 VPN、Tailscale 或自行部署的 HTTPS 私有入口。工具箱自带「回家 VPN」排除工具箱自身，不能为此 WebView 提供访问路径。
-- 保持电脑在线且 HAPI hub、runner 运行。电脑睡眠或服务停止时不可达；网页会处理会话重连，主页面连接失败可刷新重试。
-- HAPI 为 AGPL-3.0-only 开源项目；本项目不打包或修改 HAPI 代码，Windows 脚本按固定版本独立安装。源代码：<https://github.com/tiann/hapi>。Codex 使用账号或 provider 自身额度。
-
-## 验证
-
-- Windows x64：固定版本的真实 HAPI hub、runner 与官方 Codex 0.164.0，隔离 CODEX_HOME、模拟 Responses 服务，覆盖创建会话、消息往返、request_user_input、回答送达与同一原生线程历史。
-- Android 15 模拟器：30 项检查，覆盖统一入口、DSH 表单登录、记住后端、两个 WebView 保留、电脑会话搜索与历史载入，以及真实 HAPI 网页登录、地址中无令牌、Keystore 存取、系统文件选择器 content URI 回传、全屏、折叠尺寸变化、返回和跨源令牌隔离。
-- 本机实际 provider：HAPI 新会话由 `gpt-6.1-sol` 返回「连接正常」。这只证明本轮账号与模型的调用，不代表其他账号或模型均可用。
-- 0.9.1：真实双目录 runner 浏览、发现原生 CLI 历史、载入并继续相同原生线程通过。本机 runner 实测显示 C:/D:/E: 等 7 个挂载盘，可浏览 C:，发现 27 个本机历史会话。
-- 实体安卓手机、外网 VPN、网页语音未做验收。
-
-复现协议测试：
+## 回退
 
 ```powershell
-python scripts/test-codex-remote.py --host-root E:\Tools\CodexRemote
+pwsh -File .\setup-codex-webui.ps1 -Action Disable -Root E:\Tools\CodexWebUI
 ```
 
-加 `--serve` 会保留隔离 fixture，供明确选定的模拟器运行 `HapiInstrumentation`。测试不改用户 Codex 配置。
+恢复原用户级 `CODEX_CLI_PATH`，再自行重启桌面。不会删除会话、令牌或源码。旧版 HAPI 服务仍可按 [0.9.2 的安装说明](https://github.com/thdlrt/AndroidToolbox/blob/v0.9.2/docs/CODEX-REMOTE.md)独立使用；3007 自制快照页面已不作为默认方案。
 
-静态检查：112 项 JVM 测试，0 失败、1 项既有 NAS 实机测试默认跳过；Windows 配置迁移测试通过。完整 lint 扫描仍有 19 项既有错误，逐行核对 0.9.0 已发布源码均存在，无新增错误；未为本功能修改这些既有问题。
+## 验证与边界
 
-## 0.9.2 验证
+- 上游测试加局域网 UUID 兼容回归共 89 项通过。
+- 真实 Windows Codex 引擎、隔离 CODEX_HOME 和模拟 Responses 服务：14 项共享运行时检查通过，覆盖双向会话发现、流式事件、引导进入模型输入、队列接续、模型/强度同步、停止和重连恢复。模拟的是模型响应，Codex 引擎与桥接使用真实二进制。
+- Android 15 指定模拟器：26 项 WebView 检查通过，覆盖手机渲染、发送、引导、排队、模型/推理强度实际进入模型请求、停止、凭据隔离、重载、全屏和软键盘。
+- 安装脚本已在现有独立源码目录重复执行并验证，未擅自重启正在使用的桌面应用。
+- 现有桌面进程须在启用后重启才能接入；未重启时不能据隔离测试声称已监看真实桌面。
+- 本地 Windows 桌面运行时是本版范围；其他远程主机自己的 app-server、ChatGPT 云会话、实体手机及外网链路不在上述验收范围内。
 
-114 项 JVM 测试（0 失败、1 项既有 NAS 跳过）、8 项 Node API 测试和17 项 Android 15实时页面检查通过。生产桌面只读验证返回25个会话，当前会话active、轮次inProgress；消息发送、超时和重复提交均用隔离fixture验证，未向其他真实聊天发测试消息。
+复现：
 
 ```powershell
-node --test scripts/test-codex-desktop.mjs
-python scripts/test-codex-remote-config.py
+node scripts/test-codex-webui.mjs E:\Tools\CodexWebUI C:\实际路径\codex.exe
 ```
 
-实体手机、外网连接、网页语音仍未验收。
-
-回归补充：真实隔离 HAPI＋官方 Codex 协议链路通过；另30项 Android HAPI／DSH回归检查通过（登录、原生历史载入、附件、两个后端保留、全屏和折叠）。
+加 `--serve` 保留隔离服务，供明确选定的模拟器运行 `CodexWebInstrumentation`。所有测试使用临时配置，不修改用户 Codex 账号和配置文件。上游为 MIT 许可，本项目提供固定版本安装和小型兼容补丁；[上游源码与许可](https://github.com/DusuWorks/codex-webui/blob/main/LICENSE)。
