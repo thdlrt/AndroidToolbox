@@ -89,14 +89,14 @@ final class ToolUi {
         private View bottom;
         private final ScrollView railScroll; private TextView brand; private int navigationWidth;
         private String selected;
-        private boolean wide, bottomEnabled=true;
+        private boolean wide, bottomEnabled=true, fullscreen;
         private final java.util.Map<String,LinearLayout> rows=new java.util.LinkedHashMap<>();
         private final String[][] items={{"home","首页","home"},{"relay","文件中转站","transfer"},{"vpn","回家 VPN","shield"},{"ledger","项目记账","ledger"},{"diagnostics","网络诊断","network"},{"parcel","取件助手","parcel"},{"pocket","手机访问","pocket"},{"tools","全部工具","grid"},{"settings","设置","settings"}};
         Shell(MainActivity a,View body,String selected){
             super(a);activity=a;this.selected=selected;setOrientation(HORIZONTAL);setBackgroundColor(BG);
             rail=column(a);rail.setTag("toolbox-navigation");rail.setPadding(dp(a,16),dp(a,24),dp(a,16),dp(a,20));rail.setBackgroundColor(0xffedf1f8);
             railScroll=new ScrollView(a);railScroll.setFillViewport(true);railScroll.setVerticalScrollBarEnabled(false);railScroll.addView(rail);addView(railScroll,new LinearLayout.LayoutParams(dp(a,88),-1));addView(body,new LinearLayout.LayoutParams(0,-1,1));railScroll.setVisibility(GONE);
-            setOnApplyWindowInsetsListener((v,i)->{setPadding(i.getSystemWindowInsetLeft(),i.getSystemWindowInsetTop(),i.getSystemWindowInsetRight(),i.getSystemWindowInsetBottom());return i;});
+            setOnApplyWindowInsetsListener((v,i)->{if(fullscreen)setPadding(0,0,0,0);else setPadding(i.getSystemWindowInsetLeft(),i.getSystemWindowInsetTop(),i.getSystemWindowInsetRight(),i.getSystemWindowInsetBottom());return i;});
             TextView name=text(activity,"工具箱",22,INK);brand=name;name.setTypeface(null,Typeface.BOLD);rail.addView(name,new LinearLayout.LayoutParams(-1,dp(activity,64)));
             for(String[] item:items){
                 LinearLayout row=new LinearLayout(activity);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(activity,12),0,dp(activity,8),0);
@@ -109,11 +109,12 @@ final class ToolUi {
         }
         void bottom(View view){bottom=view;updateNavigation();}
         void bottomEnabled(boolean enabled){bottomEnabled=enabled;updateNavigation();}
+        void fullscreen(boolean on){if(fullscreen==on)return;fullscreen=on;updateNavigation();requestApplyInsets();}
         private void updateNavigation(){
-            boolean expanded=navigationWidth>=dp(activity,1100);railScroll.setVisibility(wide?VISIBLE:GONE);railScroll.getLayoutParams().width=dp(activity,expanded?200:88);railScroll.requestLayout();
+            boolean expanded=navigationWidth>=dp(activity,1100);railScroll.setVisibility(wide&&!fullscreen?VISIBLE:GONE);railScroll.getLayoutParams().width=dp(activity,expanded?200:88);railScroll.requestLayout();
             rail.setPadding(dp(activity,expanded?16:8),dp(activity,16),dp(activity,expanded?16:8),dp(activity,16));brand.setTextSize(expanded?22:15);brand.setGravity(Gravity.CENTER);
             for(LinearLayout row:rows.values()){row.setOrientation(expanded?HORIZONTAL:VERTICAL);row.setGravity(expanded?Gravity.CENTER_VERTICAL:Gravity.CENTER);row.setPadding(dp(activity,expanded?12:2),dp(activity,8),dp(activity,expanded?8:2),dp(activity,8));TextView label=(TextView)row.getChildAt(1);label.setTextSize(expanded?14:11);label.setGravity(expanded?Gravity.START:Gravity.CENTER);label.setPadding(dp(activity,expanded?12:0),dp(activity,expanded?0:5),0,0);row.getLayoutParams().height=LayoutParams.WRAP_CONTENT;row.setMinimumHeight(dp(activity,expanded?56:72));}
-            if(bottom!=null)bottom.setVisibility(wide||!bottomEnabled?GONE:VISIBLE);
+            if(bottom!=null)bottom.setVisibility(fullscreen||wide||!bottomEnabled?GONE:VISIBLE);
         }
         void refreshFavorites(){for(String[] item:items){boolean tool=!java.util.Arrays.asList("home","tools","settings").contains(item[0]);rows.get(item[0]).setVisibility(!tool||activity.getPreferences(0).getBoolean("favorite."+item[0],true)?VISIBLE:GONE);}}
         void selected(String value){
@@ -148,6 +149,8 @@ final class ToolUi {
             case "chevron":line(c,6,9,12,15,18,9);break;
             case "back":line(c,15,5,8,12,15,19);break;
             case "close":line(c,6,6,18,18);line(c,18,6,6,18);break;
+            case "expand":line(c,4,9,4,4,9,4);line(c,15,4,20,4,20,9);line(c,20,15,20,20,15,20);line(c,9,20,4,20,4,15);break;
+            case "contract":line(c,4,4,9,9);line(c,4,9,4,4,9,4);line(c,20,4,15,9);line(c,15,4,20,4,20,9);line(c,20,20,15,15);line(c,20,15,20,20,15,20);line(c,4,20,9,15);line(c,9,20,4,20,4,15);break;
             case "search":c.drawCircle(10,10,6,paint);line(c,15,15,21,21);break;
             case "refresh":line(c,20,4,20,10,14,10);c.drawArc(4,4,20,20,40,285,false,paint);break;
             case "trash":line(c,4,6,20,6);line(c,9,6,9,3,15,3,15,6);line(c,6,6,7,21,17,21,18,6);line(c,10,10,10,17);line(c,14,10,14,17);break;

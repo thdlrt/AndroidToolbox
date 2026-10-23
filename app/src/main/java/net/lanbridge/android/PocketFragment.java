@@ -7,11 +7,14 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.DisplayCutout;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.webkit.CookieManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
@@ -45,17 +48,25 @@ public final class PocketFragment extends ToolFragment {
     private TextView hostView;
     private TextView failureMessage;
     private ImageButton refreshButton;
+    private ImageButton fullscreenButton;
+    private ImageButton exitFullscreen;
+    private LinearLayout header;
     private LinearLayout failure;
+    private WindowInsets lastInsets;
     private String origin = "";
     private String pin = "";
     private String host = "";
     private boolean loaded;
+    private boolean fullscreen;
     private int logins;
 
     @Override protected View createContent(Bundle state) {
+        FrameLayout page = new FrameLayout(context());
+        page.setBackgroundColor(ToolUi.BG);
         LinearLayout root = ToolUi.column(context());
         root.setBackgroundColor(ToolUi.BG);
-        root.addView(header());
+        header = header();
+        root.addView(header);
         progress = new ProgressBar(context(), null, android.R.attr.progressBarStyleHorizontal);
         progress.setMax(100);
         progress.setProgressTintList(ColorStateList.valueOf(ToolUi.BLUE));
@@ -64,11 +75,24 @@ public final class PocketFragment extends ToolFragment {
         root.addView(progress, new LinearLayout.LayoutParams(-1, dp(2)));
         stage = new FrameLayout(context());
         root.addView(stage, new LinearLayout.LayoutParams(-1, 0, 1));
+        page.addView(root, new FrameLayout.LayoutParams(-1, -1));
+        exitFullscreen = exitButton();
+        FrameLayout.LayoutParams exitParams = new FrameLayout.LayoutParams(dp(42), dp(42), Gravity.TOP | Gravity.END);
+        exitParams.topMargin = dp(10);
+        exitParams.rightMargin = dp(10);
+        page.addView(exitFullscreen, exitParams);
+        fullscreen = ((MainActivity) context()).pocketFullscreen() && PocketSettings.configured(context());
+        applyFullscreenUi(fullscreen);
+        page.setOnApplyWindowInsetsListener((v, insets) -> {
+            lastInsets = insets;
+            applyCutout(insets);
+            return insets;
+        });
         render();
-        return root;
+        return page;
     }
 
-    private View header() {
+    private LinearLayout header() {
         LinearLayout row = new LinearLayout(context());
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.addView(ToolUi.iconButton(context(), "back", "返回工具箱", this::closePage));
@@ -87,9 +111,67 @@ public final class PocketFragment extends ToolFragment {
             reload();
         });
         row.addView(refreshButton);
+        fullscreenButton = ToolUi.iconButton(context(), "expand", "全屏查看", () -> ((MainActivity) context()).setPocketFullscreen(true));
+        row.addView(fullscreenButton);
         row.addView(ToolUi.iconButton(context(), "settings", "连接设置", this::editSettings));
         row.setPadding(0, 0, 0, dp(4));
         return row;
+    }
+
+    private ImageButton exitButton() {
+        ImageButton button = new ImageButton(context());
+        button.setImageDrawable(new ToolUi.Icon("contract", 0xffffffff));
+        button.setContentDescription("退出全屏");
+        button.setTooltipText("退出全屏");
+        GradientDrawable background = new GradientDrawable();
+        background.setShape(GradientDrawable.OVAL);
+        background.setColor(0x99101828);
+        button.setBackground(background);
+        button.setPadding(dp(10), dp(10), dp(10), dp(10));
+        button.setElevation(dp(4));
+        button.setVisibility(View.GONE);
+        button.setOnClickListener(v -> ((MainActivity) context()).setPocketFullscreen(false));
+        return button;
+    }
+
+    /** Keeps the page chrome and the WebView padding in step with immersive mode. */
+    void applyFullscreenUi(boolean on) {
+        fullscreen = on;
+        if (header != null) header.setVisibility(on ? View.GONE : View.VISIBLE);
+        if (exitFullscreen != null) exitFullscreen.setVisibility(on ? View.VISIBLE : View.GONE);
+        View root = getView();
+        if (root != null) {
+            root.requestLayout();
+            root.requestApplyInsets();
+        }
+    }
+
+    /** A foldable's inner screen or a camera cutout must not cover the page or the exit button. */
+    private void applyCutout(WindowInsets insets) {
+        if (insets == null) return;
+        DisplayCutout cut = insets.getDisplayCutout();
+        int left = cut == null ? 0 : cut.getSafeInsetLeft();
+        int top = cut == null ? 0 : cut.getSafeInsetTop();
+        int right = cut == null ? 0 : cut.getSafeInsetRight();
+        int bottom = cut == null ? 0 : cut.getSafeInsetBottom();
+        if (exitFullscreen != null) {
+            FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) exitFullscreen.getLayoutParams();
+            int marginTop = dp(10) + top, marginRight = dp(10) + right;
+            if (params.topMargin != marginTop || params.rightMargin != marginRight) {
+                params.topMargin = marginTop;
+                params.rightMargin = marginRight;
+                exitFullscreen.setLayoutParams(params);
+            }
+        }
+        if (web != null) {
+            int l = fullscreen ? left : 0, t = fullscreen ? top : 0, r = fullscreen ? right : 0, b = fullscreen ? bottom : 0;
+            if (web.getPaddingLeft() != l || web.getPaddingTop() != t || web.getPaddingRight() != r || web.getPaddingBottom() != b)
+                web.setPadding(l, t, r, b);
+        }
+    }
+
+    @Override boolean fullBleed() {
+        return fullscreen;
     }
 
     private void render() {
@@ -98,7 +180,9 @@ public final class PocketFragment extends ToolFragment {
         origin = PocketSettings.origin(context());
         pin = PocketSettings.pin(context());
         host = Uri.parse(origin).getHost() == null ? "" : Uri.parse(origin).getHost();
-        if (PocketSettings.configured(context())) {
+        boolean ready = PocketSettings.configured(context());
+        if (fullscreenButton != null) fullscreenButton.setVisibility(ready ? View.VISIBLE : View.GONE);
+        if (ready) {
             hostView.setText(PocketSettings.display(origin));
             hostView.setVisibility(View.VISIBLE);
             refreshButton.setVisibility(View.VISIBLE);
@@ -107,6 +191,7 @@ public final class PocketFragment extends ToolFragment {
             hostView.setVisibility(View.GONE);
             refreshButton.setVisibility(View.GONE);
             stage.addView(setupForm());
+            if (((MainActivity) context()).pocketFullscreen()) ((MainActivity) context()).setPocketFullscreen(false);
         }
     }
 
@@ -213,6 +298,7 @@ public final class PocketFragment extends ToolFragment {
             });
         }
         if (stage.indexOfChild(web) < 0) stage.addView(web, new FrameLayout.LayoutParams(-1, -1));
+        if (lastInsets != null) applyCutout(lastInsets);
         if (!loaded) {
             loaded = true;
             reload();
@@ -358,6 +444,10 @@ public final class PocketFragment extends ToolFragment {
     }
 
     @Override boolean back() {
+        if (((MainActivity) context()).pocketFullscreen()) {
+            ((MainActivity) context()).setPocketFullscreen(false);
+            return true;
+        }
         if (web != null && web.canGoBack()) { web.goBack(); return true; }
         return false;
     }
@@ -379,6 +469,7 @@ public final class PocketFragment extends ToolFragment {
             web = null;
         }
         loaded = false;
+        lastInsets = null;
         super.onDestroyView();
     }
 

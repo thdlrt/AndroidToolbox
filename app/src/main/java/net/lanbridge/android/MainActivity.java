@@ -1,8 +1,12 @@
 package net.lanbridge.android;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import android.app.*;
 import android.content.*;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.*;
 import android.view.inputmethod.InputMethodManager;
@@ -21,6 +25,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         if(!manager.running)observedSync=completed;syncHandler.postDelayed(this,700);}};
     private String page = "home", connectionReturn = "settings", aiReturn = "settings";
     private LinearLayout globalBar;
+    private boolean pocketFullscreen;
 
     static String pageFor(ComponentName component) {
         if (component == null) return null;
@@ -57,11 +62,14 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
             connectionReturn = state.getString("connectionReturn","settings");
             aiReturn = state.getString("aiReturn","settings");
             show(page,false,null);
+            if (state.getBoolean("pocketFullscreen",false) && "pocket".equals(page) && PocketSettings.configured(this))
+                setPocketFullscreen(true);
         } else handleIntent(getIntent());
     }
     void show(String id) { show(id,true,null); }
     private void show(String id,boolean animate,Intent incoming) {
         if (!java.util.Arrays.asList("home","tools","settings","relay","vpn","webdav","ledger","diagnostics","parcel","pocket","ai-settings").contains(id)) id="home";
+        if (pocketFullscreen && !"pocket".equals(id)) setPocketFullscreen(false);
         // The pocket page is a full-width web view: the shared sync bar would only steal height there.
         if (globalBar != null) globalBar.setVisibility("pocket".equals(id) ? View.GONE : View.VISIBLE);
         FragmentManager manager = getFragmentManager();
@@ -97,6 +105,46 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         shell.selected((page.equals("webdav") || page.equals("ai-settings")) ? "settings" : page);
         renderBottom();
     }
+    boolean pocketFullscreen(){return pocketFullscreen;}
+    /** Keep immersive mode after a trip through Recents or the notification shade. */
+    @Override public void onWindowFocusChanged(boolean hasFocus){
+        super.onWindowFocusChanged(hasFocus);
+        if(hasFocus&&pocketFullscreen)applyFullscreenWindow(true);
+    }
+    /** The pocket page can take the whole window: no rail, no bottom bar, no system bars. */
+    void setPocketFullscreen(boolean on){
+        if(pocketFullscreen==on)return;
+        pocketFullscreen=on;
+        if(shell!=null)shell.fullscreen(on);
+        applyFullscreenWindow(on);
+        ToolFragment active=(ToolFragment)getFragmentManager().findFragmentByTag("pocket");
+        if(active instanceof PocketFragment)((PocketFragment)active).applyFullscreenUi(on);
+    }
+    private void applyFullscreenWindow(boolean on){
+        Window window=getWindow();View decor=window.getDecorView();
+        WindowInsetsControllerCompat controller=WindowCompat.getInsetsController(window,decor);
+        controller.setAppearanceLightStatusBars(true);
+        controller.setAppearanceLightNavigationBars(true);
+        WindowManager.LayoutParams attrs=window.getAttributes();
+        if(on){
+            WindowCompat.setDecorFitsSystemWindows(window,false);
+            window.setStatusBarColor(Color.TRANSPARENT);
+            window.setNavigationBarColor(Color.TRANSPARENT);
+            attrs.layoutInDisplayCutoutMode=WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            window.setAttributes(attrs);
+            controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            controller.hide(WindowInsetsCompat.Type.systemBars());
+            decor.requestApplyInsets();
+        }else{
+            controller.show(WindowInsetsCompat.Type.systemBars());
+            WindowCompat.setDecorFitsSystemWindows(window,true);
+            window.setStatusBarColor(0xfff3f6fc);
+            window.setNavigationBarColor(0xfff3f6fc);
+            attrs.layoutInDisplayCutoutMode=WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT;
+            window.setAttributes(attrs);
+            decor.requestApplyInsets();
+        }
+    }
     private void renderBottom() {
         bottom.removeAllViews();
         shell.bottomEnabled(page.equals("home") || page.equals("tools") || page.equals("settings"));
@@ -123,7 +171,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
     @Override protected void onStart(){super.onStart();ParcelAutoReader.get(this).opened();ParcelNotifications.get(this).opened();}
     @Override protected void onResume() { super.onResume();AppUpdater.get(this).resumeInstall(this);observedSync=DataSyncManager.get(this).lastSuccess;DataSyncManager.get(this).requestAll(DataSyncManager.Trigger.STARTUP);syncHandler.post(syncRefresh); }
     @Override protected void onPause(){syncHandler.removeCallbacks(syncRefresh);super.onPause();}
-    @Override protected void onSaveInstanceState(Bundle state) { super.onSaveInstanceState(state);state.putString("page",page);state.putString("connectionReturn",connectionReturn);state.putString("aiReturn",aiReturn); }
+    @Override protected void onSaveInstanceState(Bundle state) { super.onSaveInstanceState(state);state.putString("page",page);state.putString("connectionReturn",connectionReturn);state.putString("aiReturn",aiReturn);state.putBoolean("pocketFullscreen",pocketFullscreen); }
     void closePage() { show(page.equals("webdav")?connectionReturn:page.equals("ai-settings")?aiReturn:"home"); }
     @Override public void onBackPressed() {
         ToolFragment active=(ToolFragment)getFragmentManager().findFragmentByTag(page);
