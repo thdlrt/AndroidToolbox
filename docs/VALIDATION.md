@@ -8,6 +8,7 @@
 - 正常网络实测：设备联网、DNS 2/2、网页 HTTP 200；模拟器网络拦截 `119.29.29.29:443` 时 IP 段正确显示 1/2 和「注意」，没有误判整网断开。飞行模式实测显示「未联网」并跳过 DNS/IP/网页三项。折叠屏 2200x2480 下两张诊断卡并排、结果通栏。
 - JVM 104 项：103 通过、1 项真实 NAS 测试按默认策略跳过、0 失败；含 4 项 `NetworkDiagnosticsTest`。
 - 正式签名 APK：`outputs/AndroidToolbox-0.8.0.apk`，包名 `net.lanbridge.android`，versionCode 26、versionName 0.8.0；14,014,308 字节，SHA-256 `5c9a8240360a030775280901869bd79232f5a54e5039636681519d5cb994e663`。签名证书 SHA-256 `f299b831be45343d8f2fb1b6f2c6557075946f93ab099fd1b4d746f1fd2501d7`，与历史发行版一致。模拟器安装正式包后启动并跑通一键自检；截图 `.build/release-0.8.0-diagnostics.png`、`.build/release-0.8.0-selfcheck.png`。
+- 已发布 GitHub Release `v0.8.0`，上传 `AndroidToolbox-0.8.0.apk` 与同名 `.sha256`。从发行地址重新下载校验：大小 14,014,308 字节、SHA-256 与本地构建一致，`aapt2` 读出包名 `net.lanbridge.android`、版本 0.8.0/code26，`apksigner` 证书指纹与历史一致；`/releases/latest` 返回 v0.8.0。
 
 ## 0.6.7 手动编辑快递信息（2026-10-12，本地签名包）
 
