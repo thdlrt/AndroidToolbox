@@ -30,6 +30,8 @@ public final class DiagnosticsFragment extends ToolFragment {
     private JSONObject selected,lastReport;
     private boolean selfMode;
 
+    void inspect(String address){selected=null;selfMode=false;target.setText(address);port.setText("");attempts.setText("1");run();}
+
     @Override protected View createContent(Bundle state){
         sync=LedgerSync.get(context());
         scroll=new ScrollView(context());

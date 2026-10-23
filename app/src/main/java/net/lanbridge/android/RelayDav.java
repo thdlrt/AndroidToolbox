@@ -23,10 +23,13 @@ public final class RelayDav implements AutoCloseable {
     private final String auth;
     private volatile boolean cancelled;
     public RelayDav(String address,String folder,String username,String password) throws IOException {
+        this(address,folder,username,password,new RecoveringDns(Dns.SYSTEM,AndroidFreshDns::lookup));
+    }
+    RelayDav(String address,String folder,String username,String password,Dns dns) throws IOException {
         HttpUrl base=endpoint(address);path(folder,false);
         HttpUrl.Builder b=base.newBuilder();for(String part:folder.split("/"))b.addPathSegment(part);b.addPathSegment("");root=b.build();
         auth=Credentials.basic(username,password,StandardCharsets.UTF_8);
-        client=new OkHttpClient.Builder().followRedirects(false).followSslRedirects(false).connectTimeout(15,TimeUnit.SECONDS).readTimeout(60,TimeUnit.SECONDS).writeTimeout(60,TimeUnit.SECONDS).build();
+        client=new OkHttpClient.Builder().dns(dns).followRedirects(false).followSslRedirects(false).connectTimeout(15,TimeUnit.SECONDS).readTimeout(60,TimeUnit.SECONDS).writeTimeout(60,TimeUnit.SECONDS).build();
     }
     public static HttpUrl endpoint(String value)throws IOException {
         HttpUrl u=HttpUrl.parse(value.trim());
@@ -44,7 +47,9 @@ public final class RelayDav implements AutoCloseable {
     private void checkCancelled()throws IOException {if(cancelled||Thread.currentThread().isInterrupted())throw new IOException("操作已取消");}
     private Response request(String method,HttpUrl url,RequestBody body,String... headers)throws IOException {
         checkCancelled();Request.Builder b=new Request.Builder().url(url).header("Authorization",auth).method(method,body);
-        for(int i=0;i<headers.length;i+=2)b.header(headers[i],headers[i+1]);return client.newCall(b.build()).execute();
+        for(int i=0;i<headers.length;i+=2)b.header(headers[i],headers[i+1]);
+        try{return client.newCall(b.build()).execute();}
+        catch(java.net.UnknownHostException error){throw new IOException("无法解析 WebDAV 地址 "+url.host()+"。已重新查询系统 DNS，请检查手机的 DNS、私人 DNS 或 VPN 设置。",error);}
     }
     private static void checked(Response r,int... expected)throws IOException {for(int code:expected)if(r.code()==code)return;throw new IOException("WebDAV 请求失败（HTTP "+r.code()+"）");}
     private static String text(Element e,String tag){NodeList nodes=e.getElementsByTagNameNS("DAV:",tag);return nodes.getLength()==0?"":nodes.item(0).getTextContent();}
