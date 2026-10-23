@@ -38,4 +38,5 @@ SHA-256 提供传输完整性，发布方身份最终由 APK 签名约束。签�
 
 - `AndroidConfigBackup` / `ConfigBackupService`：明确的配置白名单；手动上传和确认后恢复，不触及记账或附件。恢复前保存本机配置副本，WebDAV 连接/根目录与密码不会被恢复覆盖。
 
-- `HapiFragment` / `HapiSettings` / `HapiConnection`：独立 HAPI WebView，令牌只注入精确同源的 HAPI 本地存储；凭据用独立 LoginStore/Keystore，地址不含令牌，跨源链接交给系统浏览器。共用原有远程页面全屏窗口，保留 DSH 入口。
+- `HapiFragment` / `HapiSettings` / `HapiConnection`：独立 HAPI WebView，令牌只注入精确同源的 HAPI 本地存储；凭据用独立 LoginStore/Keystore，地址不含令牌，跨源链接交给系统浏览器。`RemoteUi` 与 DSH 共用「手机访问」入口，两个 Fragment 保留独立网页，记录上次后端并共用全屏窗口。
+- `HapiApi` / `HapiSessionsDialog`：后台认证后通过 HAPI 的本机历史 RPC 列出会话；按标题/目录搜索，明确选择后导入并打开。HTTP 不跟随重定向，CLI 令牌与 JWT 不进入 URL，不覆盖原始 Codex 历史。Windows runner 使用多个磁盘根目录，保留旧单目录配置兼容路径。

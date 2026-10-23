@@ -1,9 +1,10 @@
 param(
-    [ValidateSet('Install','Start','Stop','Status','Info','Hub','Runner')][string]$Action='Status',
+    [ValidateSet('Install','Configure','Start','Stop','Status','Info','Hub','Runner')][string]$Action='Status',
     [string]$Root=(Join-Path $env:LOCALAPPDATA 'AndroidToolbox/CodexRemote'),
     [ValidateRange(1024,65535)][int]$Port=3006,
     [string]$ListenHost='127.0.0.1',
-    [string]$WorkspaceRoot='',
+    [string[]]$WorkspaceRoot=@(),
+    [switch]$AllDrives,
     [string]$CodexHome=''
 )
 $ErrorActionPreference='Stop'
@@ -14,6 +15,34 @@ $taskData=Join-Path $Root 'data'
 $taskConfig=Join-Path $Root 'remote.json'
 $taskLauncher=Join-Path $Root 'codex-remote.ps1'
 function Read-Config { if(-not(Test-Path -LiteralPath $taskConfig)){throw 'Run Install first.'}; Get-Content -Raw -LiteralPath $taskConfig | ConvertFrom-Json }
+function Workspace-Roots($Settings){
+    if($Settings.allDrives){
+        return @([IO.DriveInfo]::GetDrives() | Where-Object {$_.IsReady -and $_.DriveType -ne [IO.DriveType]::CDRom} | ForEach-Object {$_.RootDirectory.FullName})
+    }
+    if($Settings.workspaceRoots){return @($Settings.workspaceRoots)}
+    if($Settings.workspaceRoot){return @($Settings.workspaceRoot)}
+    throw 'No workspace directories configured. Run -Action Configure -AllDrives.'
+}
+function Resolve-WorkspaceRoots {
+    if($AllDrives -and $WorkspaceRoot.Count){throw 'Use -AllDrives or -WorkspaceRoot, not both.'}
+    return @($WorkspaceRoot | ForEach-Object {
+        $taskDirectory=Get-Item -LiteralPath $_
+        if(-not $taskDirectory.PSIsContainer){throw 'WorkspaceRoot must name a directory.'}
+        $taskDirectory.FullName
+    } | Select-Object -Unique)
+}
+if($Action -eq 'Configure'){
+    if(-not $AllDrives -and -not $WorkspaceRoot.Count){throw 'Specify -AllDrives or -WorkspaceRoot.'}
+    $taskSettings=Read-Config
+    $taskRoots=@(Resolve-WorkspaceRoots)
+    $taskSettings | Add-Member -NotePropertyName allDrives -NotePropertyValue ([bool]$AllDrives) -Force
+    $taskSettings | Add-Member -NotePropertyName workspaceRoots -NotePropertyValue $taskRoots -Force
+    if($taskSettings.PSObject.Properties['workspaceRoot']){$taskSettings.PSObject.Properties.Remove('workspaceRoot')}
+    [IO.File]::WriteAllText($taskConfig,($taskSettings | ConvertTo-Json),[Text.UTF8Encoding]::new($false))
+    if([IO.Path]::GetFullPath($PSCommandPath) -ne $taskLauncher){Copy-Item -LiteralPath $PSCommandPath -Destination $taskLauncher -Force}
+    Write-Output 'Workspace access updated. Run -Action Start to refresh the runner; existing hub data is preserved.'
+    exit
+}
 function Detached([string]$Role){
     # Win32_Process.Create starts from WmiPrvSE, outside the invoking terminal/app job.
     $taskStartup=New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{ShowWindow=[uint16]0}
@@ -24,8 +53,7 @@ function Detached([string]$Role){
 }
 if($Action -eq 'Install'){
     if($Root.Contains('"') -or $Root.Contains("`n")){throw 'Invalid install path'}
-    if([string]::IsNullOrWhiteSpace($WorkspaceRoot)){throw 'Specify -WorkspaceRoot with the directory allowed for remote sessions.'}
-    $WorkspaceRoot=(Resolve-Path -LiteralPath $WorkspaceRoot).Path
+    $taskRoots=@(Resolve-WorkspaceRoots)
     New-Item -ItemType Directory -Force -Path $Root,$taskData | Out-Null
     # Includes hub/runner credentials and logs. Keep these local to this Windows account.
     $taskSid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
@@ -37,7 +65,7 @@ if($Action -eq 'Install'){
     $taskCodexVersion=& (Join-Path $taskCodexBin 'codex.exe') --version
     if($taskCodexVersion -ne 'codex-cli 0.164.0'){throw 'Unexpected Codex CLI version'}
     if($CodexHome){$CodexHome=[IO.Path]::GetFullPath($CodexHome)}
-    $taskSaved=@{port=$Port;listenHost=$ListenHost;workspaceRoot=$WorkspaceRoot;codexHome=$CodexHome}
+    $taskSaved=@{port=$Port;listenHost=$ListenHost;workspaceRoots=$taskRoots;allDrives=([bool]$AllDrives -or -not $taskRoots.Count);codexHome=$CodexHome}
     [IO.File]::WriteAllText($taskConfig,($taskSaved | ConvertTo-Json),[Text.UTF8Encoding]::new($false))
     if([IO.Path]::GetFullPath($PSCommandPath) -ne $taskLauncher){Copy-Item -LiteralPath $PSCommandPath -Destination $taskLauncher -Force}
     if(-not(Test-Path -LiteralPath (Join-Path $taskData 'settings.json'))){
@@ -57,7 +85,12 @@ $env:HAPI_ANDROID_PUSH='off';$env:HAPI_IOS_PUSH='off';$env:TELEGRAM_NOTIFICATION
 $env:PATH="$taskCodexBin;$(Join-Path $Root 'node_modules/.bin');$env:PATH"
 if($taskSettings.codexHome){$env:CODEX_HOME=$taskSettings.codexHome}
 if($Action -eq 'Hub'){& $taskHapi hub --no-relay *> (Join-Path $taskData 'hub.log');exit $LASTEXITCODE}
-if($Action -eq 'Runner'){& $taskHapi runner start --workspace-root $taskSettings.workspaceRoot *> (Join-Path $taskData 'runner-launch.log');exit $LASTEXITCODE}
+if($Action -eq 'Runner'){
+    $taskRunnerArgs=@('runner','start')
+    foreach($taskWorkspace in @(Workspace-Roots $taskSettings)){$taskRunnerArgs+=@('--workspace-root',$taskWorkspace)}
+    if($taskRunnerArgs.Count -eq 2){throw 'No mounted workspace drives are available.'}
+    & $taskHapi @taskRunnerArgs *> (Join-Path $taskData 'runner-launch.log');exit $LASTEXITCODE
+}
 if($Action -eq 'Start'){
     $taskListener=Get-NetTCPConnection -LocalPort $taskSettings.port -State Listen -ErrorAction SilentlyContinue
     if($taskListener){
@@ -84,9 +117,9 @@ if($Action -eq 'Start'){
     Write-Output 'Stopped this HAPI hub and runner.'
 }elseif($Action -eq 'Info'){
     # Explicit user command only: never paste this output into logs, issues, or release assets.
-    Write-Output "Port: $($taskSettings.port); bind: $($taskSettings.listenHost); workspace: $($taskSettings.workspaceRoot)"
+    Write-Output "Port: $($taskSettings.port); bind: $($taskSettings.listenHost); workspaces: $((Workspace-Roots $taskSettings) -join ', ')"
     Write-Output ('Access token: '+(Get-Content -Raw -LiteralPath (Join-Path $taskData 'settings.json') | ConvertFrom-Json).cliApiToken)
 }else{
     $taskListener=Get-NetTCPConnection -LocalPort $taskSettings.port -State Listen -ErrorAction SilentlyContinue
-    [pscustomobject]@{running=[bool]$taskListener;port=$taskSettings.port;listenHost=$taskSettings.listenHost;workspace=$taskSettings.workspaceRoot;hapi='0.30.7';codex='0.164.0'} | ConvertTo-Json
+    [pscustomobject]@{running=[bool]$taskListener;port=$taskSettings.port;listenHost=$taskSettings.listenHost;workspaces=@(Workspace-Roots $taskSettings);allDrives=[bool]$taskSettings.allDrives;hapi='0.30.7';codex='0.164.0'} | ConvertTo-Json
 }

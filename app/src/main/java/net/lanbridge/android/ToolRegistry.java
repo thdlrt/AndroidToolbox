@@ -10,5 +10,5 @@ public final class ToolRegistry {
         public final Class<? extends Activity> activity;
         Tool(String id,String name,String description,Class<? extends Activity> activity){this.id=id;this.name=name;this.description=description;this.activity=activity;}
     }
-    public static final List<Tool> TOOLS=List.of(new Tool("vpn","回家 VPN","通过 FN Connect 访问局域网，或使用家中 TCP 出口。",VpnActivity.class),new Tool("relay","文件中转站","通过飞牛 WebDAV 在电脑与手机间传递文件。",RelayActivity.class),new Tool("ledger","项目记账","按项目记录收支、拍照附件，与 PC 自动合并同步。",LedgerActivity.class),new Tool("diagnostics","网络诊断","检查 DNS、TCP、TLS、HTTP，共享诊断配置。",DiagnosticsActivity.class),new Tool("parcel","取件助手","选择短信或图片，使用 AI 整理取件信息并归档。",ParcelActivity.class),new Tool("pocket","手机访问","在手机上打开电脑里的 DSH，免手动登录。",PocketActivity.class),new Tool("hapi","Codex 远程","通过 HAPI 连接电脑上的 Codex 会话。",HapiActivity.class));
+    public static final List<Tool> TOOLS=List.of(new Tool("vpn","回家 VPN","通过 FN Connect 访问局域网，或使用家中 TCP 出口。",VpnActivity.class),new Tool("relay","文件中转站","通过飞牛 WebDAV 在电脑与手机间传递文件。",RelayActivity.class),new Tool("ledger","项目记账","按项目记录收支、拍照附件，与 PC 自动合并同步。",LedgerActivity.class),new Tool("diagnostics","网络诊断","检查 DNS、TCP、TLS、HTTP，共享诊断配置。",DiagnosticsActivity.class),new Tool("parcel","取件助手","选择短信或图片，使用 AI 整理取件信息并归档。",ParcelActivity.class),new Tool("pocket","手机访问","远程使用电脑上的 Codex 和 DSH。",PocketActivity.class));
 }

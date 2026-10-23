@@ -51,6 +51,7 @@ public final class PocketFragment extends ToolFragment {
     private ImageButton fullscreenButton;
     private ImageButton exitFullscreen;
     private LinearLayout header;
+    private LinearLayout tabs;
     private LinearLayout failure;
     private WindowInsets lastInsets;
     private String origin = "";
@@ -67,6 +68,7 @@ public final class PocketFragment extends ToolFragment {
         root.setBackgroundColor(ToolUi.BG);
         header = header();
         root.addView(header);
+        tabs=RemoteUi.tabs(context(),"pocket",null);root.addView(tabs);
         progress = new ProgressBar(context(), null, android.R.attr.progressBarStyleHorizontal);
         progress.setMax(100);
         progress.setProgressTintList(ColorStateList.valueOf(ToolUi.BLUE));
@@ -138,6 +140,7 @@ public final class PocketFragment extends ToolFragment {
     void applyFullscreenUi(boolean on) {
         fullscreen = on;
         if (header != null) header.setVisibility(on ? View.GONE : View.VISIBLE);
+        if (tabs != null) tabs.setVisibility(on ? View.GONE : View.VISIBLE);
         if (exitFullscreen != null) exitFullscreen.setVisibility(on ? View.VISIBLE : View.GONE);
         View root = getView();
         if (root != null) {

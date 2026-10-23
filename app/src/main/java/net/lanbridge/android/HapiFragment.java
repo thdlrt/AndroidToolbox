@@ -17,6 +17,7 @@ public final class HapiFragment extends ToolFragment {
     private static final int PICK=6421;
     private FrameLayout stage;
     private LinearLayout header;
+    private LinearLayout tabs;
     private ImageButton exit;
     private ProgressBar progress;
     private WebView web;
@@ -24,6 +25,7 @@ public final class HapiFragment extends ToolFragment {
     private String origin="", token="";
     private boolean installed;
     private ValueCallback<Uri[]> picker;
+    private HapiSessionsDialog sessionsDialog;
 
     @Override protected View createContent(Bundle state){
         FrameLayout page=new FrameLayout(context());
@@ -31,12 +33,13 @@ public final class HapiFragment extends ToolFragment {
         header=new LinearLayout(context());header.setGravity(Gravity.CENTER_VERTICAL);
         header.addView(ToolUi.iconButton(context(),"back","返回工具箱",this::closePage));
         LinearLayout words=ToolUi.column(context());
-        TextView title=ToolUi.text(context(),"Codex 远程",23,ToolUi.INK);title.setTypeface(null,Typeface.BOLD);words.addView(title);
+        TextView title=ToolUi.text(context(),"手机访问",23,ToolUi.INK);title.setTypeface(null,Typeface.BOLD);words.addView(title);
         host=ToolUi.text(context(),"",11,ToolUi.MUTED);words.addView(host);
         header.addView(words,new LinearLayout.LayoutParams(0,-2,1));
         header.addView(ToolUi.iconButton(context(),"refresh","重新加载",()->{if(web!=null)web.reload();}));
         header.addView(ToolUi.iconButton(context(),"expand","全屏查看",()->{if(HapiSettings.configured(context()))((MainActivity)context()).setPocketFullscreen(true);}));
         header.addView(ToolUi.iconButton(context(),"settings","连接设置",this::editSettings));root.addView(header);
+        tabs=RemoteUi.tabs(context(),"hapi",()->{if(HapiSettings.configured(context())){sessionsDialog=new HapiSessionsDialog(context(),origin,token,path->{ensureBrowser();web.loadUrl(origin+path);});sessionsDialog.show();}else editSettings();});root.addView(tabs);
         progress=new ProgressBar(context(),null,android.R.attr.progressBarStyleHorizontal);progress.setVisibility(View.GONE);root.addView(progress,new LinearLayout.LayoutParams(-1,dp(2)));
         stage=new FrameLayout(context());root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));page.addView(root,new FrameLayout.LayoutParams(-1,-1));
         exit=new ImageButton(context());exit.setImageDrawable(new ToolUi.Icon("contract",0xffffffff));exit.setContentDescription("退出全屏");exit.setTooltipText("退出全屏");
@@ -109,12 +112,12 @@ public final class HapiFragment extends ToolFragment {
     }
     private void failure(String text){TextView t=ToolUi.text(context(),text,14,ToolUi.MUTED);t.setPadding(dp(24),dp(24),dp(24),dp(24));t.setBackgroundColor(ToolUi.BG);t.setTag("hapi-error");View old=stage.findViewWithTag("hapi-error");if(old!=null)stage.removeView(old);stage.addView(t,new FrameLayout.LayoutParams(-1,-2));t.setOnClickListener(v->{stage.removeView(t);if(web!=null)web.reload();});}
     @Override public void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==PICK&&picker!=null){picker.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result,data));picker=null;}}
-    void applyFullscreenUi(boolean on){if(header!=null)header.setVisibility(on?View.GONE:View.VISIBLE);if(exit!=null)exit.setVisibility(on?View.VISIBLE:View.GONE);if(getView()!=null){getView().requestLayout();getView().requestApplyInsets();}}
+    void applyFullscreenUi(boolean on){if(header!=null)header.setVisibility(on?View.GONE:View.VISIBLE);if(tabs!=null)tabs.setVisibility(on?View.GONE:View.VISIBLE);if(exit!=null)exit.setVisibility(on?View.VISIBLE:View.GONE);if(getView()!=null){getView().requestLayout();getView().requestApplyInsets();}}
     @Override boolean fullBleed(){return ((MainActivity)context()).pocketFullscreen();}
     @Override boolean back(){if(((MainActivity)context()).pocketFullscreen()){((MainActivity)context()).setPocketFullscreen(false);return true;}if(web!=null&&web.canGoBack()){web.goBack();return true;}return false;}
     @Override protected void onPageResume(){if(web!=null)web.onResume();}
     @Override protected void onPagePause(){if(web!=null)web.onPause();}
     private void destroyBrowser(){if(picker!=null){picker.onReceiveValue(null);picker=null;}if(web!=null){if(web.getParent()!=null)((ViewGroup)web.getParent()).removeView(web);web.destroy();web=null;}installed=false;}
-    @Override public void onDestroyView(){destroyBrowser();if(settingsDialog!=null)settingsDialog.dismiss();super.onDestroyView();}
+    @Override public void onDestroyView(){destroyBrowser();if(settingsDialog!=null)settingsDialog.dismiss();if(sessionsDialog!=null)sessionsDialog.dismiss();super.onDestroyView();}
     private int dp(int n){return ToolUi.dp(context(),n);}
 }

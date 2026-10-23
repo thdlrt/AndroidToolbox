@@ -36,13 +36,14 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
         if (name.equals(LedgerActivity.class.getName())) return "ledger";
         if (name.equals(DiagnosticsActivity.class.getName())) return "diagnostics";
         if (name.equals(ParcelActivity.class.getName())) return "parcel";
-        if (name.equals(PocketActivity.class.getName())) return "pocket";
+        if (name.equals(PocketActivity.class.getName())) return "remote";
         if (name.equals(HapiActivity.class.getName())) return "hapi";
         if (name.equals(AiSettingsActivity.class.getName())) return "ai-settings";
         return null;
     }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        if(getPreferences(0).contains("favorite.hapi"))getPreferences(0).edit().putBoolean("favorite.pocket",getPreferences(0).getBoolean("favorite.pocket",true)||getPreferences(0).getBoolean("favorite.hapi",true)).remove("favorite.hapi").apply();
         RuntimeLog.record(this,"应用启动","版本="+BuildConfig.VERSION_NAME+"；Android="+android.os.Build.VERSION.RELEASE+"；设备="+android.os.Build.MANUFACTURER+" "+android.os.Build.MODEL);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         try{ConfigBackupService.recoverPending(this);}catch(Exception e){Toast.makeText(this,"本机配置恢复未完成，请重试",Toast.LENGTH_LONG).show();}
@@ -69,6 +70,7 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
     }
     void show(String id) { show(id,true,null); }
     private void show(String id,boolean animate,Intent incoming) {
+        if("remote".equals(id))id=getPreferences(0).getString("remote.provider",HapiSettings.configured(this)?"hapi":"pocket");
         if (!java.util.Arrays.asList("home","tools","settings","relay","vpn","webdav","ledger","diagnostics","parcel","pocket","hapi","ai-settings").contains(id)) id="home";
         if (pocketFullscreen && !page.equals(id)) setPocketFullscreen(false);
         // The pocket page is a full-width web view: the shared sync bar would only steal height there.
@@ -101,9 +103,10 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
             if (incoming != null && next instanceof RelayFragment) ((RelayFragment)next).receiveIntent(new Intent(incoming));
         }
         page = id;
+        if("pocket".equals(id)||"hapi".equals(id))getPreferences(0).edit().putString("remote.provider",id).apply();
         transaction.commitNow();
         if (incoming != null && next instanceof ParcelFragment) ((ParcelFragment)next).receiveIntent(new Intent(incoming));
-        shell.selected((page.equals("webdav") || page.equals("ai-settings")) ? "settings" : page);
+        shell.selected((page.equals("webdav") || page.equals("ai-settings")) ? "settings" : page.equals("hapi")?"pocket":page);
         renderBottom();
     }
     boolean pocketFullscreen(){return pocketFullscreen;}

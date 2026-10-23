@@ -14,6 +14,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import urllib.parse
 import uuid
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -22,14 +23,18 @@ parser.add_argument('--host-root', type=pathlib.Path, required=True)
 parser.add_argument('--serve', action='store_true')
 args = parser.parse_args()
 work = ROOT / '.build' / ('hapi-validation-' + uuid.uuid4().hex[:8])
-ch, hh, cwd = (work / name for name in ('codex', 'hapi', 'workspace'))
-for folder in (ch, hh, cwd): folder.mkdir(parents=True)
+ch, hh, cwd, second = (work / name for name in ('codex', 'hapi', 'workspace', 'second-workspace'))
+for folder in (ch, hh, cwd, second): folder.mkdir(parents=True)
 TOKEN = 'isolated-hapi-integration-fixture'
 requests = []
+stop_fixture=threading.Event()
 
 
 class Model(http.server.BaseHTTPRequestHandler):
     def log_message(self, *a): pass
+    def do_GET(self):
+        if self.path!='/stop-fixture':self.send_error(404);return
+        self.send_response(200);self.end_headers();stop_fixture.set()
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
         requests.append(body)
@@ -50,6 +55,18 @@ class Model(http.server.BaseHTTPRequestHandler):
 
 model = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Model)
 threading.Thread(target=model.serve_forever, daemon=True).start()
+class DshFixture(http.server.BaseHTTPRequestHandler):
+    def log_message(self,*args):pass
+    def do_GET(self):
+        logged='dsh_fixture=valid' in self.headers.get('Cookie','')
+        body=('DSH_FIXTURE_SESSION' if logged else '<form action="/pocket-login" method="POST"><input name="username" value="dsh-pocket"><input id="current-password" name="token" type="password"></form>').encode()
+        self.send_response(200);self.send_header('Content-Type','text/html; charset=utf-8');self.end_headers();self.wfile.write(body)
+    def do_POST(self):
+        form=urllib.parse.parse_qs(self.rfile.read(int(self.headers['Content-Length'])).decode())
+        assert form.get('token')==['12345678'] and form.get('username')==['dsh-pocket'],form
+        self.send_response(302);self.send_header('Set-Cookie','dsh_fixture=valid; HttpOnly; Path=/; SameSite=Lax');self.send_header('Location','/');self.end_headers()
+dsh=http.server.ThreadingHTTPServer(('0.0.0.0',0),DshFixture)
+threading.Thread(target=dsh.serve_forever,daemon=True).start()
 with socket.socket() as s: s.bind(('127.0.0.1',0));port=s.getsockname()[1]
 base = f'http://127.0.0.1:{port}'
 hh.joinpath('settings.json').write_text(json.dumps({'cliApiToken':TOKEN,'apiUrl':base}),encoding='utf-8')
@@ -106,8 +123,36 @@ try:
     launch('hub','--no-relay')
     wait(lambda:urllib.request.urlopen(base,timeout=2).status,lambda v:v==200,'hub HTTP')
     jwt=api('/auth',{'accessToken':TOKEN})['token']
-    launch('runner','start-sync','--workspace-root',str(cwd))
+    launch('runner','start-sync','--workspace-root',str(cwd),'--workspace-root',str(second))
     machine=wait(lambda:api('/machines')['machines'],bool,'runner online')[0]['id']
+    roots=api('/machines')['machines'][0]['metadata']['workspaceRoots']
+    assert str(cwd) in roots and str(second) in roots,roots
+    assert api(f'/machines/{machine}/list-directory',{'path':str(second)})['success']
+    # A real native CLI history, not initially registered with HAPI. Same local
+    # transcript format as desktop chats; only the fixture home is used.
+    def native_history(prompt):
+        # Child tool hosts may retain inherited pipe handles after exec exits on
+        # Windows. Files let us wait for the actual process, not a descendant's EOF.
+        output=work/(prompt+'.stdout.log');errors=work/(prompt+'.stderr.log')
+        with output.open('w',encoding='utf-8') as stdout,errors.open('w',encoding='utf-8') as stderr:
+            result=subprocess.run([str(codex_bin/'codex.exe'),'exec','--json','--skip-git-repo-check','-C',str(second),prompt],env=env,stdout=stdout,stderr=stderr,timeout=60,creationflags=0x08000000)
+        assert result.returncode==0,errors.read_text(encoding='utf-8')[-600:]
+        events=[json.loads(line) for line in output.read_text(encoding='utf-8').splitlines() if line.startswith('{')]
+        return next(event['thread_id'] for event in events if event.get('type')=='thread.started')
+    desktop_native=native_history('RESUME_DESKTOP_FIXTURE')
+    desktop_android=native_history('ANDROID_DESKTOP_FIXTURE')
+    local=api('/codex/sessions')['sessions']
+    assert {desktop_native,desktop_android}.issubset({row['id'] for row in local}),local
+    imported=api('/codex/sync-session',{'sessionIds':[desktop_native],'machineId':machine})
+    assert imported.get('success'),imported
+    desktop_hapi=imported['hapiSessionIds'][0]
+    assert 'HELLO_FROM_WINDOWS' in json.dumps(api(f'/sessions/{desktop_hapi}/messages'))
+    resumed=api(f'/sessions/{desktop_hapi}/resume',{})
+    assert resumed.get('sessionId'),resumed
+    desktop_hapi=resumed['sessionId']
+    api(f'/sessions/{desktop_hapi}/messages',{'text':'CONTINUE_DESKTOP_FIXTURE','localId':uuid.uuid4().hex})
+    wait(lambda:api(f'/sessions/{desktop_hapi}/messages'),lambda v:'CONTINUE_DESKTOP_FIXTURE' in json.dumps(v) and json.dumps(v).count('HELLO_FROM_WINDOWS')>=2,'continued native history')
+    assert api(f'/sessions/{desktop_hapi}')['session']['metadata']['codexSessionId']==desktop_native
     spawned=api(f'/machines/{machine}/spawn',{'directory':str(cwd),'agent':'codex','model':'mock-model','permissionMode':'default','collaborationMode':'plan'})
     assert spawned.get('sessionId'),spawned
     session=spawned['sessionId']
@@ -121,15 +166,16 @@ try:
     # The same thread, persisted history, authenticated reload, and another sender.
     assert api(f'/sessions/{session}')['session']['metadata']['codexSessionId']
     assert len(requests)>=3
-    info={'base':base,'port':port,'token':TOKEN,'sessionId':session,'work':str(work),'checks':['real Windows hub','runner spawn','official Codex 0.164.0','fixture model roundtrip','remote request_user_input','answer delivery','persistent native thread']}
+    info={'base':base,'port':port,'token':TOKEN,'sessionId':session,'desktopSessionId':desktop_android,'desktopDirectory':str(second),'dshPort':dsh.server_port,'stopPort':model.server_port,'work':str(work),'checks':['real Windows hub','multiple workspace roots','browse outside initial workspace','native Codex history discovery','import native history','continue same native thread','runner spawn','official Codex 0.164.0','fixture model roundtrip','remote request_user_input','answer delivery','persistent native thread']}
     ROOT.joinpath('.build/hapi-fixture.json').write_text(json.dumps(info),encoding='utf-8')
     print('PASS: '+', '.join(info['checks']),flush=True)
     if args.serve:
         print(f'Android fixture ready on port {port}; details in .build/hapi-fixture.json',flush=True)
-        while True:time.sleep(1)
+        stop_fixture.wait()
 finally:
     try:
         if jwt and 'session' in locals():api(f'/sessions/{session}/archive',{})
+        if jwt and 'desktop_hapi' in locals():api(f'/sessions/{desktop_hapi}/archive',{})
     except Exception:pass
     for p in reversed(processes):
         if p.poll() is None:p.terminate()
@@ -138,3 +184,4 @@ finally:
         except subprocess.TimeoutExpired:p.kill()
     for h in handles:h.close()
     model.shutdown()
+    dsh.shutdown()
