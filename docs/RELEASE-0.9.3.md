@@ -20,6 +20,6 @@ pwsh -File .\setup-codex-webui.ps1 -Action QR -Root E:\Tools\CodexWebUI
 
 文件中转站补充：系统 DNS 失败后原生重查一次；中文错误提示可直接进入该 WebDAV 地址的连接诊断。旧目录迁移失败不再挡住当前目录，旧文件保留。新增 6 项 JVM 与 10 项安卓 DNS/WebDAV 恢复检查通过。
 
-当前真实桌面接入已启用，仍待重启后的最终验收；本地 APK 已构建，尚未公开发布。实体手机、外网、网页语音及其他主机的运行时未验收。
+本机真实 Codex Desktop 重启后已验收：网页直接列出当前活跃桌面会话，同步显示本轮新增消息；共享运行时连接、模型目录和当前模型/推理强度均已读回。412px 手机视口无横向溢出，输入栏可见。实体手机、外网、网页语音及其他主机的运行时未验收。
 
 [完整连接、升级与回退说明](https://github.com/thdlrt/AndroidToolbox/blob/v0.9.3/docs/CODEX-REMOTE.md)。APK 沿用历史包名和签名，可覆盖升级并保留数据。
