@@ -26,4 +26,9 @@ final class HapiConnection {
         try {HttpUrl a=HttpUrl.get(expected),b=HttpUrl.get(candidate);return a.scheme().equals(b.scheme())&&a.host().equals(b.host())&&a.port()==b.port();}
         catch(Exception e){return false;}
     }
+    static String desktopOrigin(String origin){
+        HttpUrl url=HttpUrl.get(origin);
+        if(url.port()==65535)throw new IllegalArgumentException("实时会话需要另一个端口，请更换电脑服务端口");
+        return url.newBuilder().port(url.port()+1).build().toString().replaceAll("/+$","");
+    }
 }

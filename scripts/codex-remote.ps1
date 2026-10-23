@@ -1,7 +1,7 @@
 param(
-    [ValidateSet('Install','Configure','Start','Stop','Status','Info','Hub','Runner')][string]$Action='Status',
+    [ValidateSet('Install','Configure','Start','Stop','Status','Info','Hub','Runner','Desktop')][string]$Action='Status',
     [string]$Root=(Join-Path $env:LOCALAPPDATA 'AndroidToolbox/CodexRemote'),
-    [ValidateRange(1024,65535)][int]$Port=3006,
+    [ValidateRange(1024,65534)][int]$Port=3006,
     [string]$ListenHost='127.0.0.1',
     [string[]]$WorkspaceRoot=@(),
     [switch]$AllDrives,
@@ -14,6 +14,12 @@ $taskCodexBin=Join-Path $Root 'node_modules/@openai/codex-win32-x64/vendor/x86_6
 $taskData=Join-Path $Root 'data'
 $taskConfig=Join-Path $Root 'remote.json'
 $taskLauncher=Join-Path $Root 'codex-remote.ps1'
+function Copy-Companion {
+    $taskSource=Join-Path $PSScriptRoot 'codex-desktop.mjs'
+    $taskTarget=Join-Path $Root 'codex-desktop.mjs'
+    if(-not(Test-Path -LiteralPath $taskSource)){throw 'Download codex-desktop.mjs beside codex-remote.ps1 first.'}
+    if([IO.Path]::GetFullPath($taskSource) -ne $taskTarget){Copy-Item -LiteralPath $taskSource -Destination $taskTarget -Force}
+}
 function Read-Config { if(-not(Test-Path -LiteralPath $taskConfig)){throw 'Run Install first.'}; Get-Content -Raw -LiteralPath $taskConfig | ConvertFrom-Json }
 function Workspace-Roots($Settings){
     if($Settings.allDrives){
@@ -39,6 +45,7 @@ if($Action -eq 'Configure'){
     $taskSettings | Add-Member -NotePropertyName workspaceRoots -NotePropertyValue $taskRoots -Force
     if($taskSettings.PSObject.Properties['workspaceRoot']){$taskSettings.PSObject.Properties.Remove('workspaceRoot')}
     [IO.File]::WriteAllText($taskConfig,($taskSettings | ConvertTo-Json),[Text.UTF8Encoding]::new($false))
+    Copy-Companion
     if([IO.Path]::GetFullPath($PSCommandPath) -ne $taskLauncher){Copy-Item -LiteralPath $PSCommandPath -Destination $taskLauncher -Force}
     Write-Output 'Workspace access updated. Run -Action Start to refresh the runner; existing hub data is preserved.'
     exit
@@ -55,6 +62,7 @@ if($Action -eq 'Install'){
     if($Root.Contains('"') -or $Root.Contains("`n")){throw 'Invalid install path'}
     $taskRoots=@(Resolve-WorkspaceRoots)
     New-Item -ItemType Directory -Force -Path $Root,$taskData | Out-Null
+    Copy-Companion
     # Includes hub/runner credentials and logs. Keep these local to this Windows account.
     $taskSid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
     & icacls.exe $Root /inheritance:r /grant:r "*${taskSid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' | Out-Null
@@ -84,6 +92,9 @@ $env:HAPI_LISTEN_PORT=[string]$taskSettings.port
 $env:HAPI_ANDROID_PUSH='off';$env:HAPI_IOS_PUSH='off';$env:TELEGRAM_NOTIFICATION='false';$env:SERVERCHAN_NOTIFICATION='false'
 $env:PATH="$taskCodexBin;$(Join-Path $Root 'node_modules/.bin');$env:PATH"
 if($taskSettings.codexHome){$env:CODEX_HOME=$taskSettings.codexHome}
+if($Action -eq 'Desktop'){
+    & node.exe (Join-Path $Root 'codex-desktop.mjs') *> (Join-Path $taskData 'desktop.log');exit $LASTEXITCODE
+}
 if($Action -eq 'Hub'){& $taskHapi hub --no-relay *> (Join-Path $taskData 'hub.log');exit $LASTEXITCODE}
 if($Action -eq 'Runner'){
     $taskRunnerArgs=@('runner','start')
@@ -92,6 +103,8 @@ if($Action -eq 'Runner'){
     & $taskHapi @taskRunnerArgs *> (Join-Path $taskData 'runner-launch.log');exit $LASTEXITCODE
 }
 if($Action -eq 'Start'){
+    Copy-Companion
+    if([IO.Path]::GetFullPath($PSCommandPath) -ne $taskLauncher){Copy-Item -LiteralPath $PSCommandPath -Destination $taskLauncher -Force}
     $taskListener=Get-NetTCPConnection -LocalPort $taskSettings.port -State Listen -ErrorAction SilentlyContinue
     if($taskListener){
         $taskProcess=Get-CimInstance Win32_Process -Filter "ProcessId=$($taskListener[0].OwningProcess)"
@@ -106,7 +119,21 @@ if($Action -eq 'Start'){
         if(-not $taskReady){throw 'HAPI did not start; inspect data/hub.log.'}
     }
     $null=Detached 'Runner'
-    Write-Output "HAPI started on $($taskSettings.listenHost):$($taskSettings.port). Use -Action Info for the private token."
+    $taskDesktopPort=[int]$taskSettings.port+1
+    $taskDesktopListener=Get-NetTCPConnection -LocalPort $taskDesktopPort -State Listen -ErrorAction SilentlyContinue
+    if($taskDesktopListener){
+        $taskDesktopProcess=Get-CimInstance Win32_Process -Filter "ProcessId=$($taskDesktopListener[0].OwningProcess)"
+        if($taskDesktopProcess.Name -ne 'node.exe' -or -not $taskDesktopProcess.CommandLine.Contains((Join-Path $Root 'codex-desktop.mjs'))){throw 'Desktop port belongs to another application.'}
+        Stop-Process -Id $taskDesktopProcess.ProcessId
+    }
+    $null=Detached 'Desktop'
+    $taskDesktopReady=$false
+    for($taskTry=0;$taskTry -lt 20;$taskTry++){
+        try{$taskResponse=Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$taskDesktopPort/" -TimeoutSec 2;if($taskResponse.StatusCode -eq 200){$taskDesktopReady=$true;break}}catch{}
+        Start-Sleep -Milliseconds 300
+    }
+    if(-not $taskDesktopReady){throw 'Desktop companion did not start; inspect data/desktop.log.'}
+    Write-Output "HAPI: $($taskSettings.port); live Desktop: $taskDesktopPort. Use -Action Info for the private token."
 }elseif($Action -eq 'Stop'){
     & $taskHapi runner stop *> (Join-Path $taskData 'runner-stop.log')
     $taskListener=Get-NetTCPConnection -LocalPort $taskSettings.port -State Listen -ErrorAction SilentlyContinue
@@ -115,11 +142,18 @@ if($Action -eq 'Start'){
         if($taskProcess.ExecutablePath -eq $taskHapi -and $taskProcess.CommandLine -match ' hub '){Stop-Process -Id $taskProcessId}
     }
     Write-Output 'Stopped this HAPI hub and runner.'
+    $taskDesktopPort=[int]$taskSettings.port+1
+    $taskDesktopListener=Get-NetTCPConnection -LocalPort $taskDesktopPort -State Listen -ErrorAction SilentlyContinue
+    foreach($taskProcessId in @($taskDesktopListener.OwningProcess | Select-Object -Unique)){
+        $taskProcess=Get-CimInstance Win32_Process -Filter "ProcessId=$taskProcessId"
+        if($taskProcess.Name -eq 'node.exe' -and $taskProcess.CommandLine.Contains((Join-Path $Root 'codex-desktop.mjs'))){Stop-Process -Id $taskProcessId}
+    }
 }elseif($Action -eq 'Info'){
     # Explicit user command only: never paste this output into logs, issues, or release assets.
     Write-Output "Port: $($taskSettings.port); bind: $($taskSettings.listenHost); workspaces: $((Workspace-Roots $taskSettings) -join ', ')"
     Write-Output ('Access token: '+(Get-Content -Raw -LiteralPath (Join-Path $taskData 'settings.json') | ConvertFrom-Json).cliApiToken)
 }else{
     $taskListener=Get-NetTCPConnection -LocalPort $taskSettings.port -State Listen -ErrorAction SilentlyContinue
-    [pscustomobject]@{running=[bool]$taskListener;port=$taskSettings.port;listenHost=$taskSettings.listenHost;workspaces=@(Workspace-Roots $taskSettings);allDrives=[bool]$taskSettings.allDrives;hapi='0.30.7';codex='0.164.0'} | ConvertTo-Json
+    $taskDesktopPort=[int]$taskSettings.port+1
+    [pscustomobject]@{running=[bool]$taskListener;port=$taskSettings.port;desktopPort=$taskDesktopPort;desktopRunning=[bool](Get-NetTCPConnection -LocalPort $taskDesktopPort -State Listen -ErrorAction SilentlyContinue);listenHost=$taskSettings.listenHost;workspaces=@(Workspace-Roots $taskSettings);allDrives=[bool]$taskSettings.allDrives;hapi='0.30.7';codex='0.164.0'} | ConvertTo-Json
 }

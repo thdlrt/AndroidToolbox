@@ -5,6 +5,8 @@
 local.properties
 app/src/main/jniLibs/
 outputs/
+.playwright-cli/
+output/playwright/
 .agent/
 .agents/
 *.log
