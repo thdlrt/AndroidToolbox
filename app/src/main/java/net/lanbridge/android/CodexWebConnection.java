@@ -7,6 +7,10 @@ import okhttp3.HttpUrl;
 final class CodexWebConnection {
     final String origin, token;
     private CodexWebConnection(String origin,String token){this.origin=origin;this.token=token;}
+    static boolean sameOrigin(String expected,String candidate){
+        try{HttpUrl a=HttpUrl.get(expected),b=HttpUrl.get(candidate);return a.scheme().equals(b.scheme())&&a.host().equals(b.host())&&a.port()==b.port();}
+        catch(Exception e){return false;}
+    }
     static CodexWebConnection parse(String address,String explicitToken)throws IOException{
         String value=address==null?"":address.trim();
         if(value.isEmpty())throw new IOException("请填写 Codex WebUI 地址，例如 192.168.1.10:9526");

@@ -3,6 +3,7 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class CodexWebConnectionTest {
+    @Test public void authAndUploadsStayOnExactOrigin(){assertTrue(CodexWebConnection.sameOrigin("https://host","https://host:443/chat"));for(String candidate:new String[]{"http://host","https://host:9526","https://host.evil","file:///local",null})assertFalse(candidate,CodexWebConnection.sameOrigin("https://host",candidate));}
     @Test public void explicitWebuiPortHasNoTranslation()throws Exception{assertEquals("http://192.168.1.10:9526",CodexWebConnection.parse("192.168.1.10:9526", "x").origin);}
     @Test public void acceptsFragmentQrWithoutKeepingSecretInOrigin()throws Exception{CodexWebConnection v=CodexWebConnection.parse("https://host/#token=cw_a%2Bb", "");assertEquals("https://host",v.origin);assertEquals("cw_a+b",v.token);}
     @Test public void explicitTokenOverridesUrl()throws Exception{assertEquals("new",CodexWebConnection.parse("http://host/?token=old", " new ").token);}

@@ -68,7 +68,7 @@ public final class PocketFragment extends ToolFragment {
         root.setBackgroundColor(ToolUi.BG);
         header = header();
         root.addView(header);
-        tabs=RemoteUi.tabs(context(),"pocket",null);root.addView(tabs);
+        tabs=RemoteUi.tabs(context(),"pocket");root.addView(tabs);
         progress = new ProgressBar(context(), null, android.R.attr.progressBarStyleHorizontal);
         progress.setMax(100);
         progress.setProgressTintList(ColorStateList.valueOf(ToolUi.BLUE));

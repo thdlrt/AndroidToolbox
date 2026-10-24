@@ -64,13 +64,13 @@ public final class MainActivity extends androidx.appcompat.app.AppCompatActivity
             connectionReturn = state.getString("connectionReturn","settings");
             aiReturn = state.getString("aiReturn","settings");
             show(page,false,null);
-            if (state.getBoolean("pocketFullscreen",false) && (("pocket".equals(page) && PocketSettings.configured(this)) || ("hapi".equals(page) && HapiSettings.configured(this))))
+            if (state.getBoolean("pocketFullscreen",false) && (("pocket".equals(page) && PocketSettings.configured(this)) || ("hapi".equals(page) && CodexWebSettings.configured(this))))
                 setPocketFullscreen(true);
         } else handleIntent(getIntent());
     }
     void show(String id) { show(id,true,null); }
     private void show(String id,boolean animate,Intent incoming) {
-        if("remote".equals(id))id=getPreferences(0).getString("remote.provider",HapiSettings.configured(this)?"hapi":"pocket");
+        if("remote".equals(id))id=getPreferences(0).getString("remote.provider",CodexWebSettings.configured(this)?"hapi":"pocket");
         if (!java.util.Arrays.asList("home","tools","settings","relay","vpn","webdav","ledger","diagnostics","parcel","pocket","hapi","ai-settings").contains(id)) id="home";
         if (pocketFullscreen && !page.equals(id)) setPocketFullscreen(false);
         // The pocket page is a full-width web view: the shared sync bar would only steal height there.

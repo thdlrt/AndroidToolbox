@@ -1,6 +1,6 @@
 # Codex 远程（Codex WebUI）
 
-0.9.3 的「手机访问 → Codex」嵌入 [DusuWorks/codex-webui](https://github.com/DusuWorks/codex-webui)。网页与 Windows Codex Desktop 共用一个 app-server：桌面发起的会话、实时输出、引导和队列都走同一运行时。DSH 仍在同一个入口；HAPI 使用独立连接和凭据，保留用于它自己管理的会话。
+「手机访问 → Codex」嵌入 [DusuWorks/codex-webui](https://github.com/DusuWorks/codex-webui)。网页与 Windows Codex Desktop 共用一个 app-server：桌面发起的会话、实时输出、引导和队列都走同一运行时。0.9.4 起入口只保留 DSH 和 Codex，移除旧 HAPI 切换及会话导入实现；升级保留现有 Codex WebUI 和 DSH 的连接设置。
 
 ## Windows 安装
 
@@ -36,7 +36,7 @@ QR 命令在电脑本地显示私有连接链接和二维码。链接含令牌�
 5. 输入栏齿轮展开模型、推理强度、权限设置。模型和强度写入共享会话，活跃轮次期间的变更用于后续轮次；实际可选项以本机 provider 返回为准。
 6. 新会话可浏览当前 Windows 账号可访问的磁盘与目录。默认令牌不限定单个工作区；无权访问的目录仍会报错。
 
-顶部可切换 DSH、HAPI、全屏和连接设置。DSH、Codex WebUI、HAPI 的凭据分开保存；旧 HAPI 地址和令牌不会自动用于新服务。网页图片上传使用系统文件选择器。没有接入网页语音录制。
+顶部可切换 DSH、Codex、全屏和连接设置。DSH 与 Codex WebUI 的凭据分开保存。网页图片上传使用系统文件选择器。没有接入网页语音录制。
 
 ## 回退
 
@@ -44,13 +44,13 @@ QR 命令在电脑本地显示私有连接链接和二维码。链接含令牌�
 pwsh -File .\setup-codex-webui.ps1 -Action Disable -Root E:\Tools\CodexWebUI
 ```
 
-恢复原用户级 `CODEX_CLI_PATH`，再自行重启桌面。不会删除会话、令牌或源码。旧版 HAPI 服务仍可按 [0.9.2 的安装说明](https://github.com/thdlrt/AndroidToolbox/blob/v0.9.2/docs/CODEX-REMOTE.md)独立使用；3007 自制快照页面已不作为默认方案。
+恢复原用户级 `CODEX_CLI_PATH`，再自行重启桌面。不会删除会话、令牌或源码。
 
 ## 验证与边界
 
 - 上游测试加局域网 UUID 兼容回归共 89 项通过。
 - 真实 Windows Codex 引擎、隔离 CODEX_HOME 和模拟 Responses 服务：14 项共享运行时检查通过，覆盖双向会话发现、流式事件、引导进入模型输入、队列接续、模型/强度同步、停止和重连恢复。模拟的是模型响应，Codex 引擎与桥接使用真实二进制。
-- Android 15 指定模拟器：26 项 WebView 检查通过，覆盖手机渲染、发送、引导、排队、模型/推理强度实际进入模型请求、停止、凭据隔离、重载、全屏和软键盘。
+- Android 15 指定模拟器：40 项 WebView 检查通过，覆盖手机渲染、发送、引导、排队、模型/推理强度实际进入模型请求、停止、凭据隔离、重载、全屏和软键盘，以及移除旧入口后 DSH/Codex 登录、页面切换与恢复。
 - 安装脚本已在现有独立源码目录重复执行并验证，未擅自重启正在使用的桌面应用。
 - 本机真实 Codex Desktop 在启用后完整重启，已验证共享管道连接、活跃桌面会话发现及本轮新增消息同步；网页读回当前模型和推理强度，412px 手机视口输入栏可见且无横向溢出。启用前已经运行的桌面进程仍须完整重启才能接入。
 - 本地 Windows 桌面运行时是本版范围；其他远程主机自己的 app-server、ChatGPT 云会话、实体手机及外网链路不在上述验收范围内。

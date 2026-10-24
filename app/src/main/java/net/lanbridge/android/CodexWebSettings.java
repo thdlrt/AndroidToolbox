@@ -3,7 +3,7 @@ package net.lanbridge.android;
 import android.content.Context;
 import java.io.IOException;
 
-/** The shared Desktop bridge has independent credentials from legacy HAPI. */
+/** Saved credentials for the shared Desktop bridge. */
 final class CodexWebSettings {
     private static final String USER="codex-webui";
     static LoginStore store(Context c){return new LoginStore(c,"codex-webui-profile","codex-webui-login-v1");}

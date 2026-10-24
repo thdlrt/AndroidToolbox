@@ -57,6 +57,18 @@ const model = createServer(async (req, res) => {
 });
 await new Promise(resolve => model.listen(0,'0.0.0.0',resolve));
 const modelPort = model.address().port;
+// The retained DSH tab still uses its normal password-form login, independent of Codex.
+const dsh=createServer(async(req,res)=>{
+  if(req.method==='POST'&&req.url==='/pocket-login'){
+    const chunks=[];for await(const chunk of req)chunks.push(chunk);
+    const form=new URLSearchParams(Buffer.concat(chunks).toString());
+    if(form.get('username')!=='dsh-pocket'||form.get('token')!=='12345678'){res.writeHead(401).end();return;}
+    res.writeHead(302,{'Set-Cookie':'dsh_fixture=valid; HttpOnly; Path=/; SameSite=Lax','Location':'/'}).end();return;
+  }
+  res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});
+  res.end(req.headers.cookie?.includes('dsh_fixture=valid')?'DSH_FIXTURE_SESSION':'<form action="/pocket-login" method="POST"><input name="username" value="dsh-pocket"><input id="current-password" name="token" type="password"></form>');
+});
+await new Promise(resolve=>dsh.listen(0,'0.0.0.0',resolve));
 await writeFile(path.join(home,'config.toml'), `model = "gpt-5.4"\nmodel_provider = "fixture"\nmodel_reasoning_effort = "medium"\napproval_policy = "never"\nsandbox_mode = "danger-full-access"\ncheck_for_update_on_startup = false\n[model_providers.fixture]\nname = "Isolated fixture"\nbase_url = "http://127.0.0.1:${modelPort}/v1"\nwire_api = "responses"\nrequires_openai_auth = false\nsupports_websockets = false\nrequest_max_retries = 0\nstream_max_retries = 0\n[analytics]\nenabled = false\n[feedback]\nenabled = false\n`);
 const listener = createServer(); await new Promise(resolve => listener.listen(0,'127.0.0.1',resolve));
 const port = listener.address().port; await new Promise(resolve => listener.close(resolve));
@@ -148,7 +160,7 @@ try {
   const sample=await desktopRpc('turn/start',{threadId,input:input('ANDROID_RENDER_SAMPLE')});
   await web.messages.next(notification('turn/completed',threadId,sample.turn.id),25000);
   await desktopRpc('thread/settings/update',{threadId,model:'gpt-5.4',effort:'medium'});
-  const info={port,token,threadId,modelPort,work,cwd,checks};
+  const info={port,token,threadId,modelPort,dshPort:dsh.address().port,work,cwd,checks};
   await writeFile(path.join(root,'.build/webui-fixture.json'),JSON.stringify(info));
   await writeFile(path.join(work,'receipt.json'),JSON.stringify({checks,requestCount:requests.length},null,2));
   console.log(`Real engine fixture ready: ${checks.length} checks; port ${port}`);
@@ -160,4 +172,5 @@ try {
   web?.ws.terminate();web2?.ws.terminate();hold=false;releases.splice(0).forEach(f=>f());
   for(const child of children.reverse()){if(child.exitCode===null){child.kill();await Promise.race([new Promise(r=>child.once('exit',r)),new Promise(r=>setTimeout(r,2000))]);}}
   model.closeAllConnections();await new Promise(resolve=>model.close(resolve));
+  dsh.closeAllConnections();await new Promise(resolve=>dsh.close(resolve));
 }
